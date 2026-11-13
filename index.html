@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Voxelheim — Les Fragments d'Aethérium</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family: 'Segoe UI', Arial, sans-serif; }
+  #game { position:absolute; inset:0; }
+  canvas { display:block; }
+
+  #hud { position:absolute; inset:0; pointer-events:none; color:#fff; }
+  #crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:22px; opacity:.8; text-shadow:0 0 3px #000; }
+  #bars { position:absolute; left:50%; bottom:88px; transform:translateX(-50%); display:flex; gap:30px; }
+  .bar { width:180px; }
+  .bar-row { display:flex; gap:2px; }
+  .pip { width:16px; height:16px; border-radius:3px; background:#222; box-shadow:inset 0 0 0 1px #000; }
+  .pip.on.hp { background:linear-gradient(#ff6a6a,#c22); }
+  .pip.on.food { background:linear-gradient(#ffd34d,#c90); }
+  #hotbar { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); display:flex; gap:4px; pointer-events:none; }
+  .slot { width:52px; height:52px; background:rgba(0,0,0,.55); border:2px solid #555; border-radius:4px; position:relative; }
+  .slot.selected { border-color:#fff; box-shadow:0 0 8px #fff; }
+  .slot img { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:36px; height:36px; image-rendering:pixelated; }
+  .slot .count { position:absolute; right:3px; bottom:1px; font-size:13px; font-weight:bold; text-shadow:1px 1px 0 #000; }
+  #itemname { position:absolute; left:50%; bottom:76px; transform:translateX(-50%); font-size:15px; text-shadow:1px 1px 0 #000; opacity:.9; }
+
+  #overlay { position:absolute; inset:0; background:rgba(8,10,20,.92); color:#dde; display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:30px; z-index:20; }
+  #overlay h1 { font-size:44px; letter-spacing:4px; color:#9fd8ff; text-shadow:0 0 20px #3af; margin-bottom:14px; }
+  #overlay p { max-width:640px; line-height:1.6; margin-bottom:10px; font-size:15px; color:#bbc3d5; }
+  #overlay .btn { margin-top:20px; padding:12px 34px; font-size:18px; background:#2a4d8f; color:#fff; border:2px solid #7ab; border-radius:6px; cursor:pointer; }
+  #overlay .btn:hover { background:#3a6dbf; }
+  #overlay.hidden { display:none; }
+  #controls { font-size:13px; color:#889; margin-top:16px; line-height:1.7; }
+
+  #invscreen { position:absolute; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:15; }
+  #invscreen.open { display:flex; }
+  #invpanel { background:#1b1f2b; border:2px solid #4a5; border-radius:8px; padding:16px; color:#eee; }
+  #invpanel h3 { margin:4px 0 8px; color:#9fd8ff; font-size:15px; }
+  .grid { display:grid; gap:4px; }
+  .g9 { grid-template-columns:repeat(9,46px); }
+  .g3 { grid-template-columns:repeat(3,46px); }
+  .g2 { grid-template-columns:repeat(2,46px); }
+  .islot { width:46px; height:46px; background:#11141c; border:2px solid #444; border-radius:3px; position:relative; cursor:pointer; }
+  .islot:hover { border-color:#8ac; }
+  .islot img { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:32px; height:32px; image-rendering:pixelated; pointer-events:none; }
+  .islot .count { position:absolute; right:2px; bottom:0; font-size:12px; font-weight:bold; pointer-events:none; text-shadow:1px 1px 0 #000; }
+  .craftrow { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+  .arrow { font-size:26px; color:#9fd8ff; }
+  #cursoritem { position:fixed; width:34px; height:34px; pointer-events:none; z-index:50; display:none; image-rendering:pixelated; }
+  #cursorcount { position:fixed; z-index:51; color:#fff; font-weight:bold; font-size:13px; pointer-events:none; text-shadow:1px 1px 0 #000; display:none; }
+
+  #tooltip { position:fixed; background:#000c; color:#fff; padding:4px 8px; border-radius:4px; font-size:13px; pointer-events:none; z-index:60; display:none; }
+
+  #death { position:absolute; inset:0; background:rgba(120,0,0,.55); display:none; align-items:center; justify-content:center; flex-direction:column; color:#fff; z-index:30; }
+  #death h2 { font-size:40px; margin-bottom:16px; text-shadow:0 0 10px #000; }
+  #death .btn { padding:10px 26px; font-size:16px; cursor:pointer; background:#511; border:2px solid #a55; border-radius:6px; color:#fff; }
+  #progresswrap { position:fixed; left:50%; top:56%; transform:translateX(-50%); width:80px; height:8px; background:#0008; border-radius:4px; display:none; }
+  #progress { height:100%; width:0%; background:#fff; border-radius:4px; }
+  #daytime { position:absolute; right:14px; top:12px; font-size:13px; color:#cde; text-shadow:1px 1px 0 #000; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="crosshair">+</div>
+  <div id="daytime"></div>
+  <div id="bars">
+    <div class="bar"><div class="bar-row" id="hprow"></div></div>
+    <div class="bar"><div class="bar-row" id="foodrow"></div></div>
+  </div>
+  <div id="itemname"></div>
+  <div id="hotbar"></div>
+  <div id="progresswrap"><div id="progress"></div></div>
+</div>
+
+<div id="invscreen">
+  <div id="invpanel">
+    <div class="craftrow">
+      <div id="craft2" class="grid g2"></div>
+      <div id="craft3" class="grid g3" style="display:none"></div>
+      <div class="arrow">➜</div>
+      <div id="craftout" class="grid" style="grid-template-columns:46px"></div>
+    </div>
+    <h3>Sac</h3>
+    <div id="invgrid" class="grid g9"></div>
+  </div>
+</div>
+
+<div id="overlay">
+  <h1>VOXELHEIM</h1>
+  <p><b>Les Fragments d'Aethérium</b></p>
+  <p>Il y a bien longtemps, le Cœur d'Aethérium — le cristal qui maintenait l'équilibre
+  de Voxelheim — vola en éclats. Sa chute ensevelit les terres sous la Pierre d'Ancre,
+  et les éclats de lumière, la <b>Luminite</b>, demeurèrent dans les profondeurs.
+  Toi, dernier Éveillé, tu t'es relevé au milieu des plaines de Velours.</p>
+  <p>Récolte, façonne, construis. Retrouve les fragments, rallume les lanternes,
+  et rends au monde son souffle.</p>
+  <button class="btn" id="playbtn">S'éveiller</button>
+  <div id="controls">ZQSD/WASD : bouger · Espace : sauter · Clic gauche : casser · Clic droit : poser/utiliser<br>
+  Molette ou 1-9 : objet sélectionné · E : sac &amp; fabrication (2×2) · Clic droit sur l'Établi : fabrication 3×3 · F : manger</div>
+</div>
+
+<div id="death">
+  <h2>Tu t'es éteint…</h2>
+  <button class="btn" id="respawnbtn">Se relever</button>
+</div>
+
+<img id="cursoritem"><div id="cursorcount"></div>
+<div id="tooltip"></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
