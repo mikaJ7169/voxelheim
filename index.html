@@ -9,6 +9,7 @@
 <title>Voxelheim 2 — Les Chroniques de l'Éveil</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Segoe UI:wght@400&display=swap" rel="stylesheet">
@@ -129,6 +130,8 @@
   #overlay .btn:hover { box-shadow:0 0 30px rgba(127,223,255,.5), inset 0 0 18px rgba(127,223,255,.2); }
   #overlay .btn:active { background:linear-gradient(180deg,#2d529c,#1a2f5e); }
   #newbtn { display:none; background:linear-gradient(180deg,#5e2430,#3a141e); border-color:rgba(255,140,140,.5); }
+  #installbtn { display:none; background:linear-gradient(180deg,#1e5e3e,#0f3a26); border-color:rgba(140,255,190,.5); }
+  #installbtn:hover { box-shadow:0 0 30px rgba(140,255,190,.4), inset 0 0 18px rgba(140,255,190,.2); }
   #controls { font-size:13px; color:#6d7fa0; margin-top:18px; line-height:1.8; }
   #controls b { color:var(--aether-doux); }
 
@@ -252,8 +255,10 @@
   et rassemble les éclats pour rendre son souffle au monde.</p>
   <p id="saveinfo"></p>
   <button class="btn" id="playbtn">S'éveiller</button>
+  <button class="btn" id="installbtn">⬇ Installer l'application</button>
   <button class="btn" id="newbtn">Nouveau monde</button>
-  <div id="controls">Tactile : <b>zone gauche</b> joystick · <b>glisser</b> caméra · <b>tap court</b> poser · <b>appui long</b> casser<br>
+  <div id="controls">Tablette : bouton <b>⬇ Installer</b> ci-dessus, ou menu du navigateur → <b>« Installer l'application » / « Ajouter à l'écran d'accueil »</b><br>
+  Tactile : <b>zone gauche</b> joystick · <b>glisser</b> caméra · <b>tap court</b> poser · <b>appui long</b> casser<br>
   Boutons : ⛏ casser · ▣ poser/utiliser · ⤒ sauter · 🏃 sprint · 🎒 sac · 🍖 manger · 📜 chroniques · 💾 sauver<br>
   Clavier : ZQSD/WASD · Espace · <b>Shift sprint</b> · clic gauche/droit · molette · E sac · L chroniques · F manger</div>
 </div>

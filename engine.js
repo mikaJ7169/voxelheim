@@ -1385,6 +1385,22 @@ function loop(){
 
 /* ---------- Démarrage ---------- */
 let overlayHidden=false;
+const installBtn=document.getElementById('installbtn');
+let deferredInstall=null;
+addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  deferredInstall=e;
+  installBtn.style.display='block';
+});
+installBtn.addEventListener('pointerdown', async e=>{
+  e.preventDefault();
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  await deferredInstall.userChoice.catch(()=>{});
+  deferredInstall=null;
+  installBtn.style.display='none';
+}, {passive:false});
+addEventListener('appinstalled', ()=>{ installBtn.style.display='none'; deferredInstall=null; });
 spawnPlayer(false);
 const newBtn=document.getElementById('newbtn');
 if (save) newBtn.style.display='block';
