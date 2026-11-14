@@ -1,0 +1,14 @@
+{
+  "name": "Voxelheim — Les Fragments d'Aethérium",
+  "short_name": "Voxelheim",
+  "description": "Jeu voxel d'aventure et de construction",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#87b5e0",
+  "theme_color": "#87b5e0",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
