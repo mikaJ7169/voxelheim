@@ -17,9 +17,10 @@ const DEFAULT_KEYS = {
 };
 const settings = Object.assign({
   res:'native', dist:0, fov:72, shadows:'high', bloom:true, clouds:true,
-  particles:'high', motes:true, fpsCap:0, showFps:false, keys:{}
+  particles:'high', motes:false, fpsCap:0, showFps:false, keys:{}
 }, (()=>{ try { return JSON.parse(localStorage.getItem(SET_KEY)) || {}; } catch(e){ return {}; } })());
 settings.keys = Object.assign({}, DEFAULT_KEYS, settings.keys || {});
+if (!settings.motesV2){ settings.motesV2 = true; settings.motes = false; }
 function saveSettings(){ try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch(e){} }
 
 const CHUNK = 16, HEIGHT = 64;
@@ -67,7 +68,7 @@ function smooth(x,z){
 function noise2(x,z){ return smooth(x,z)*0.6 + smooth(x*2.7+31,z*2.7-17)*0.3 + smooth(x*6.1-5,z*6.1+9)*0.1; }
 
 function biomeAt(wx,wz){
-  const t = noise2(wx*0.008+500, wz*0.008-500);
+  const t = noise2(wx*0.012+500, wz*0.012-500);
   if (t < 0.34) return BIOMES.DUNES;
   if (t < 0.56) return BIOMES.PLAINE;
   if (t < 0.78) return BIOMES.SYLVE;
@@ -127,7 +128,7 @@ function genChunk(cx,cz){
     }
   }
   // ruines des Anciens (par chunk, rare)
-  if (hash(cx*7+13, cz*11-7) > 0.86){
+  if (hash(cx*7+13, cz*11-7) > 0.80){
     const rx = 4+Math.floor(hash(cx,cz)*6), rz = 4+Math.floor(hash(cx*3,cz*5)*6);
     const wx=cx*CHUNK+rx, wz=cz*CHUNK+rz;
     const bio = biomeAt(wx,wz);
@@ -290,9 +291,6 @@ function makeTexture(bid, def, face){
       for (let i=0;i<4;i++){ const x=4+i*8; g.beginPath(); g.moveTo(x,6); g.lineTo(x,10); g.moveTo(x-2,8); g.lineTo(x+2,8); g.stroke(); }
       break;
   }
-  // biseau : arêtes claires en haut/gauche, sombres en bas/droite
-  g.fillStyle='rgba(255,255,255,.10)'; g.fillRect(0,0,S,2); g.fillRect(0,0,2,S);
-  g.fillStyle='rgba(0,0,0,.20)'; g.fillRect(0,S-2,S,2); g.fillRect(S-2,0,2,S);
   const t=new THREE.CanvasTexture(cv); t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -514,6 +512,17 @@ const UV = [[0,1],[0,0],[1,1],[1,0]];
 function buildChunk(cx,cz){
   const c = getChunk(cx,cz);
   if (c.mesh){ scene.remove(c.mesh); c.mesh.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); }
+  // cache des 9 chunks voisins : évite les lookups Map à clé texte dans la boucle chaude
+  const neigh = [];
+  for (let dx=-1;dx<=1;dx++) for (let dz=-1;dz<=1;dz++)
+    neigh[(dx+1)*3+(dz+1)] = getChunk(cx+dx, cz+dz).data;
+  const gb = (lx,y,lz)=>{
+    if (y<0||y>=HEIGHT) return B.AIR;
+    let nx=1, nz=1;
+    if (lx<0){ nx=0; lx+=CHUNK; } else if (lx>=CHUNK){ nx=2; lx-=CHUNK; }
+    if (lz<0){ nz=0; lz+=CHUNK; } else if (lz>=CHUNK){ nz=2; lz-=CHUNK; }
+    return neigh[nx*3+nz][idx(lx,y,lz)];
+  };
   const groups = {};
   const ox=cx*CHUNK, oz=cz*CHUNK;
   for (let y=0;y<HEIGHT;y++) for (let z=0;z<CHUNK;z++) for (let x=0;x<CHUNK;x++){
@@ -521,7 +530,7 @@ function buildChunk(cx,cz){
     const isWater = b===B.EAU;
     for (let f=0;f<6;f++){
       const d=FACES[f].dir;
-      const nb=getBlock(ox+x+d[0], y+d[1], oz+z+d[2]);
+      const nb=gb(x+d[0], y+d[1], z+d[2]);
       if (isWater ? nb!==B.AIR : isSolid(nb)) continue;
       const g = (groups[b] ||= {pos:[],uv:[],nor:[],col:[],grps:[]});
       const cs=FACES[f].corners;
@@ -531,16 +540,16 @@ function buildChunk(cx,cz){
       const t1 = axis===0?1:0, t2 = axis===2?1:2;
       const tint = FACE_TINT[f];
       const ao = [];
+      const px=x+d[0], py=y+d[1], pz=z+d[2];
       for (let ci=0; ci<4; ci++){
-        const c=cs[ci];
-        const s1 = c[t1]===1?1:-1, s2 = c[t2]===1?1:-1;
-        const p=[ox+x+d[0], y+d[1], oz+z+d[2]];
-        const a1=[p[0],p[1],p[2]]; a1[t1]+=s1;
-        const a2=[p[0],p[1],p[2]]; a2[t2]+=s2;
-        const a3=[p[0],p[1],p[2]]; a3[t1]+=s1; a3[t2]+=s2;
-        const o1 = isSolid(getBlock(a1[0],a1[1],a1[2])) ?1:0;
-        const o2 = isSolid(getBlock(a2[0],a2[1],a2[2])) ?1:0;
-        const o3 = isSolid(getBlock(a3[0],a3[1],a3[2])) ?1:0;
+        const cn=cs[ci];
+        const s1 = cn[t1]===1?1:-1, s2 = cn[t2]===1?1:-1;
+        const a1=[px,py,pz]; a1[t1]+=s1;
+        const a2=[px,py,pz]; a2[t2]+=s2;
+        const a3=[px,py,pz]; a3[t1]+=s1; a3[t2]+=s2;
+        const o1 = isSolid(gb(a1[0],a1[1],a1[2])) ?1:0;
+        const o2 = isSolid(gb(a2[0],a2[1],a2[2])) ?1:0;
+        const o3 = isSolid(gb(a3[0],a3[1],a3[2])) ?1:0;
         const v = (o1&&o2) ? 0 : 3-(o1+o2+o3);
         ao.push((0.52+0.16*v)*tint);
       }
@@ -789,7 +798,10 @@ function renderHotbar(){
     if (nm) itemnameEl.classList.add('pop');
   }
 }
+let lastHp=-1, lastFood=-1;
 function renderBars(){
+  if (player.hp===lastHp && player.food===lastFood) return;
+  lastHp=player.hp; lastFood=player.food;
   for (let i=0;i<10;i++){
     hprow.children[i].className='pip'+(player.hp>i*2?' on hp':'');
     foodrow.children[i].className='pip'+(player.food>i*2?' on food':'');
@@ -804,16 +816,41 @@ const cursorImg=document.getElementById('cursoritem'), cursorCount=document.getE
       tooltip=document.getElementById('tooltip');
 const lorescreen=document.getElementById('lorescreen'), lorelist=document.getElementById('lorelist');
 
-function makeSlots(container, count, cb, tipcb){
+function makeSlots(container, count, cb, tipcb, altcb){
   container.innerHTML='';
   for (let i=0;i<count;i++){
     const d=document.createElement('div'); d.className='islot';
-    d.addEventListener('pointerdown', e=>{ e.preventDefault(); cb(i, e); });
-    d.addEventListener('contextmenu', e=>e.preventDefault());
+    let holdT=null, acted=false;
+    d.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      if (e.pointerType==='mouse'){ if (e.button!==2) cb(i, e); return; }
+      acted=false;
+      if (altcb) holdT=setTimeout(()=>{ holdT=null; acted=true; altcb(i); }, 380);
+    }, {passive:false});
+    d.addEventListener('pointerup', e=>{
+      if (e.pointerType==='mouse') return;
+      if (holdT){ clearTimeout(holdT); holdT=null; if (!acted) cb(i, e); }
+      acted=false;
+    });
+    d.addEventListener('pointercancel', ()=>{ if (holdT){ clearTimeout(holdT); holdT=null; } acted=false; });
+    d.addEventListener('contextmenu', e=>{ e.preventDefault(); if (altcb) altcb(i); });
     d.addEventListener('pointermove', e=>{ tipcb && tipcb(i,e); });
-    d.addEventListener('pointerleave', ()=>{ tooltip.style.display='none'; });
+    d.addEventListener('pointerleave', ()=>{ tooltip.style.display='none'; if (holdT){ clearTimeout(holdT); holdT=null; } });
     container.appendChild(d);
   }
+}
+function slotAlt(getArr, i){
+  const arr=getArr(); const s=arr[i];
+  if (cursorStack){
+    if (!s){ arr[i]={id:cursorStack.id, n:1}; cursorStack.n--; }
+    else if (s.id===cursorStack.id && s.n<64){ s.n++; cursorStack.n--; }
+    if (cursorStack.n<=0) cursorStack=null;
+  } else if (s){
+    const h=Math.ceil(s.n/2);
+    cursorStack={id:s.id, n:h}; s.n-=h;
+    if (s.n<=0) arr[i]=null;
+  }
+  worldDirty=true; renderInv();
 }
 function paintSlot(el, stack){
   el.innerHTML='';
@@ -864,11 +901,11 @@ makeSlots(invgrid, 36, (i)=>{
   const sub = d.kind==='tool' ? ('Outil · '+TOOL_TYPES[d.tool]) : d.kind==='food' ? 'Nourriture' : d.kind==='block' ? 'Bloc' : 'Matériau';
   tooltip.innerHTML=`${d.name}<span class="tsub">${sub}</span>`;
   tooltip.style.display='block'; tooltip.style.left=(e.clientX+12)+'px'; tooltip.style.top=(e.clientY-30)+'px';
-} });
+} }, (i)=>slotAlt(()=>inv, i));
 
 const craftSlotIndices = ()=> bigCraft ? [0,1,2,3,4,5,6,7,8] : [0,1,3,4];
-makeSlots(craft2, 4, (i)=>craftClick([0,1,3,4][i]));
-makeSlots(craft3, 9, (i)=>craftClick(i));
+makeSlots(craft2, 4, (i)=>craftClick([0,1,3,4][i]), null, (i)=>slotAlt(()=>craftGrid, [0,1,3,4][i]));
+makeSlots(craft3, 9, (i)=>craftClick(i), null, (i)=>slotAlt(()=>craftGrid, i));
 makeSlots(craftout, 1, ()=>{
   const r=currentRecipe(); if (!r) return;
   if (cursorStack && (cursorStack.id!==r.out.id || cursorStack.n+r.out.n>64)) return;
@@ -939,6 +976,127 @@ function eatSelected(){
   renderBars(); renderHotbar();
 }
 
+/* ---------- Créatures ---------- */
+const mobs = [];
+function boxPart(w,h,d,col,glow){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshLambertMaterial({ color:col, emissive:glow?new THREE.Color(glow):0x000000, emissiveIntensity:glow?0.9:0 }));
+  m.castShadow=true;
+  return m;
+}
+function makeNuagelet(){
+  const g=new THREE.Group();
+  const body=boxPart(0.9,0.65,1.15,0xe8ecf4); body.position.y=0.78; g.add(body);
+  const head=boxPart(0.5,0.45,0.45,0xf2f5fa); head.position.set(0,1.1,0.7); g.add(head);
+  const eyeM=new THREE.MeshBasicMaterial({color:0x1a2030});
+  for (const s of [-0.13,0.13]){ const e=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.02), eyeM); e.position.set(s,0.06,0.24); head.add(e); }
+  const legs=[];
+  for (const [x,z] of [[-0.28,0.4],[0.28,0.4],[-0.28,-0.4],[0.28,-0.4]]){
+    const l=boxPart(0.16,0.5,0.16,0xcfd6e2); l.position.set(x,0.25,z); g.add(l); legs.push(l);
+  }
+  g.userData={legs};
+  return g;
+}
+function makeOmbre(){
+  const g=new THREE.Group();
+  const body=boxPart(0.6,1.5,0.6,0x231d3d); body.position.y=1.05; g.add(body);
+  const eyeM=new THREE.MeshBasicMaterial({color:0xb89cff});
+  for (const s of [-0.14,0.14]){ const e=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.05,0.02), eyeM); e.position.set(s,0.32,0.31); body.add(e); }
+  const wisp=boxPart(0.44,0.34,0.44,0x2c2450,0x6a4ac0); wisp.position.y=0.17; g.add(wisp);
+  g.userData={legs:[]};
+  return g;
+}
+function collidesAt(px,py,pz){
+  const w=0.3;
+  for (let x=Math.floor(px-w); x<=Math.floor(px+w); x++)
+    for (let z=Math.floor(pz-w); z<=Math.floor(pz+w); z++)
+      for (let y=Math.floor(py); y<=Math.floor(py+1.4); y++)
+        if (isSolid(getBlock(x,y,z))) return true;
+  return false;
+}
+let metNuagelet=false, metOmbre=false;
+function spawnMob(type, x, z){
+  let y=HEIGHT-1; while (y>0 && !isSolid(getBlock(Math.floor(x),y,Math.floor(z)))) y--;
+  y++;
+  if (y<=SEA+1) return;
+  const mesh = type==='nuagelet'?makeNuagelet():makeOmbre();
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  mobs.push({ type, mesh, hp: type==='nuagelet'?6:10, vx:0, vz:0, tdir:0, t:9, atk:0, hurt:0, vy:0, onG:false, kx:0, kz:0 });
+  if (type==='nuagelet' && !metNuagelet){ metNuagelet=true; toast('Un Nuagelet paisible broute l\u2019herbe de Velours \u2014 approche-toi doucement.', 4200); }
+  if (type==='ombre' && !metOmbre){ metOmbre=true; toast('Une Ombre du Vide r\u00f4de\u2026 Les chroniques parlent d\u2019elles. Frappe avant qu\u2019elle ne frappe !', 5000); }
+}
+let mobTimer=2;
+function updateMobs(dt, dayness){
+  mobTimer-=dt;
+  if (mobTimer<=0){
+    mobTimer=4;
+    if (mobs.length<8){
+      const a=Math.random()*Math.PI*2, r=18+Math.random()*24;
+      const x=Math.floor(player.pos.x+Math.cos(a)*r)+0.5, z=Math.floor(player.pos.z+Math.sin(a)*r)+0.5;
+      if (dayness>0.2){ if (Math.random()<0.6) spawnMob('nuagelet', x, z); }
+      else if (dayness<0.08) spawnMob('ombre', x, z);
+    }
+  }
+  for (let i=mobs.length-1;i>=0;i--){
+    const m=mobs[i];
+    const P=m.mesh.position;
+    const dist=P.distanceTo(player.pos);
+    if (dist>64 || (m.type==='ombre' && dayness>0.25)){
+      spawnParticles(P.x-0.5, P.y, P.z-0.5, m.type==='ombre'?B.VIDE:B.GIVRE);
+      scene.remove(m.mesh); mobs.splice(i,1); continue;
+    }
+    m.t+=dt; m.atk-=dt; m.hurt-=dt;
+    let tx=0, tz=0, sp=0;
+    if (m.type==='ombre' && dist<26){
+      sp=3.6; tx=player.pos.x-P.x; tz=player.pos.z-P.z;
+    } else {
+      if (m.t>m.tdir){ m.t=0; m.tdir=2+Math.random()*4; m.vx=(Math.random()-0.5)*2; m.vz=(Math.random()-0.5)*2; if (Math.random()<0.4){ m.vx=0; m.vz=0; } }
+      sp = m.type==='nuagelet'?1.4:1.8; tx=m.vx; tz=m.vz;
+      if (m.hurt>0){ sp=5; tx=m.kx; tz=m.kz; }
+    }
+    const l=Math.hypot(tx,tz)||1;
+    const mx=tx/l*sp*dt, mz=tz/l*sp*dt;
+    if (!collidesAt(P.x+mx, P.y, P.z)) P.x+=mx;
+    if (!collidesAt(P.x, P.y, P.z+mz)) P.z+=mz;
+    m.vy-=25*dt; if (m.vy<-40) m.vy=-40;
+    const ny=P.y+m.vy*dt;
+    if (!collidesAt(P.x,ny,P.z)){ P.y=ny; m.onG=false; }
+    else { m.vy=0; m.onG=true; }
+    if (m.onG && (mx||mz) && collidesAt(P.x+mx*4, P.y, P.z+mz*4)) m.vy=8.2;
+    if (mx||mz) m.mesh.rotation.y=Math.atan2(mx,mz);
+    const sw=(mx||mz)?Math.sin(m.t*8)*0.5:0;
+    for (let li=0;li<m.mesh.userData.legs.length;li++) m.mesh.userData.legs[li].rotation.x=sw*(li%2?1:-1);
+    if (m.type==='ombre' && dist<1.8 && m.atk<=0){ m.atk=1.1; damagePlayer(2); }
+  }
+}
+function mobHit(){
+  const dir=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
+  const o=new THREE.Vector3(player.pos.x, player.pos.y+player.eye, player.pos.z);
+  let best=null, bestD=3.6;
+  for (const m of mobs){
+    const c=new THREE.Vector3(m.mesh.position.x, m.mesh.position.y+0.8, m.mesh.position.z).sub(o);
+    const d=c.length();
+    if (d>bestD) continue;
+    if (c.normalize().dot(dir)>0.93){ best=m; bestD=d; }
+  }
+  return best;
+}
+let atkCd=0;
+function hitMob(m){
+  const s=inv[hotbarSel];
+  const dmg = s && itemDef(s.id).kind==='tool' ? itemDef(s.id).dmg : 1;
+  m.hp-=dmg; m.hurt=1.2; m.atk=Math.max(m.atk,0.4);
+  const dx=m.mesh.position.x-player.pos.x, dz=m.mesh.position.z-player.pos.z;
+  const l=Math.hypot(dx,dz)||1; m.kx=dx/l; m.kz=dz/l;
+  spawnParticles(m.mesh.position.x-0.5, m.mesh.position.y+0.6, m.mesh.position.z-0.5, m.type==='ombre'?B.VIDE:B.GIVRE);
+  if (m.hp<=0){
+    if (m.type==='nuagelet') addToInv('baie', 1+Math.floor(Math.random()*2));
+    else addToInv('eclat_lum', 1+Math.floor(Math.random()*2));
+    scene.remove(m.mesh); mobs.splice(mobs.indexOf(m),1);
+  }
+}
+
 /* ---------- Raycast ---------- */
 function raycastBlock(maxDist=6){
   const dir = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
@@ -999,6 +1157,12 @@ function dropFor(blockId){
   return null;
 }
 function tryBreak(dt){
+  const mob = mobHit();
+  if (mob){
+    if (atkCd<=0){ atkCd=0.35; hitMob(mob); }
+    breaking=null; progressWrap.style.display='none';
+    return;
+  }
   const hit=raycastBlock();
   if (!hit){ breaking=null; progressWrap.style.display='none'; return; }
   const k=hit.x+','+hit.y+','+hit.z;
@@ -1233,14 +1397,14 @@ function bindSettingsUI(){
 /* ---------- Boucle ---------- */
 let last=performance.now(), timeOfDay = save?.time ?? 0.25;
 const dayEl=document.getElementById('daytime');
-let bobT=0, curFov=72;
+let bobT=0, curFov=72, hudT=0;
 const waterVeil=document.getElementById('waterveil'), hurtVeil=document.getElementById('hurtveil');
 const bodyInWater = ()=> getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+player.h*0.55), Math.floor(player.pos.z))===B.EAU;
 const headInWater = ()=> getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+player.eye), Math.floor(player.pos.z))===B.EAU;
 function tick(dt){
   const swim = bodyInWater();
   const sprinting = (down('sprint') || sprintHeld) && !swim;
-  const speed = (sprinting?2.0:1) * (player.speedBuff>0?1.4:1) * (swim?8.5:12.5);
+  const speed = (sprinting?2.0:1) * (player.speedBuff>0?1.4:1) * (swim?4.4:6.4);
   const fwd=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
   const right=new THREE.Vector3(-fwd.z,0,fwd.x);
   const move=new THREE.Vector3();
@@ -1303,6 +1467,8 @@ function tick(dt){
   const zenith = new THREE.Color(0x0a1030).lerp(new THREE.Color(0x4a90c8), Math.min(1, dayness*1.3));
   const horizonC = new THREE.Color(0x141c3e).lerp(new THREE.Color(0xc2dfef), Math.min(1, dayness*1.3));
   if (dusk>0){ zenith.lerp(new THREE.Color(0x7a3a30), dusk*0.35); horizonC.lerp(new THREE.Color(0xd8855a), dusk*0.6); }
+  updateMobs(dt, dayness);
+  atkCd-=dt;
   skyMat.uniforms.topColor.value.copy(zenith);
   skyMat.uniforms.bottomColor.value.copy(horizonC);
   const uw = headInWater();
@@ -1355,8 +1521,12 @@ function tick(dt){
     P.m.rotation.x += P.rx*dt; P.m.rotation.y += P.rx*0.7*dt;
     if (P.life<=0){ scene.remove(P.m); P.m.material.dispose(); particles.splice(i,1); }
   }
-  const hh=Math.floor(timeOfDay*24), mm=Math.floor((timeOfDay*24%1)*60);
-  dayEl.innerHTML=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')} — ${dayness>0.15?'☀ Jour':'☾ Nuit'}<br><span id="biomename">${biomeAt(p.x,p.z).name}</span>`;
+  hudT+=dt;
+  if (hudT>0.25){
+    hudT=0;
+    const hh=Math.floor(timeOfDay*24), mm=Math.floor((timeOfDay*24%1)*60);
+    dayEl.innerHTML=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')} — ${dayness>0.15?'☀ Jour':'☾ Nuit'}<br><span id="biomename">${biomeAt(p.x,p.z).name}</span>`;
+  }
 }
 function damagePlayer(v){
   if (!player.alive) return;

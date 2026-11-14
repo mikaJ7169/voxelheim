@@ -134,5 +134,6 @@ export const PAGES = [
   { id:4, title:'La Luminite', text:'Chaque éclat de Luminite garde une mémoire de lumière. Réunis en Lanternes, ils éclairent les ruines et repoussent le sommeil du Vide.' },
   { id:5, title:'Le Ferrostem', text:'Ossature du monde, le Ferrostem lie la pierre au ciel. Fondu en lingots, il forgea les outils des Anciens — et forgera les tiens.' },
   { id:6, title:'L\'Abîme', text:'Sous la Pierre du Vide dort ce qui reste du Cœur brisé. Ceux qui descendent trop profond entendent un battement. Certains ne remontent pas.' },
-  { id:7, title:'La Renaissance', text:'Si un Éveillé rassemble huit Éclats d\'Aethérium et les offre à un Autel, le Cœur renaîtra. Alors Voxelheim respirera de nouveau. C\'est ton chemin.' }
+  { id:7, title:'La Renaissance', text:'Si un Éveillé rassemble huit Éclats d\'Aethérium et les offre à un Autel, le Cœur renaîtra. Alors Voxelheim respirera de nouveau. C\'est ton chemin.' },
+  { id:8, title:'Les Ombres du Vide', text:'Quand le C\u0153ur s\u2019est bris\u00e9, des fragments de nuit ont pris vie : les Ombres. Elles fuient la lumi\u00e8re du jour et r\u00f4dent apr\u00e8s le cr\u00e9puscule. Frapp\u00e9es, elles rendent la lumi\u00e8re vol\u00e9e \u2014 de la Luminite pure. Les Nuagelets, eux, n\u2019ont rien oubli\u00e9 de la douceur d\u2019avant la Fracture.' }
 ];

@@ -1,4 +1,4 @@
-const CACHE = 'voxelheim-v8';
+const CACHE = 'voxelheim-v9';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
