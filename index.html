@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <title>Voxelheim — Les Fragments d'Aethérium</title>
+<link rel="manifest" href="manifest.json">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
   html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family: 'Segoe UI', Arial, sans-serif; }
   #game { position:absolute; inset:0; }
-  canvas { display:block; }
+  canvas { display:block; touch-action:none; }
 
   #hud { position:absolute; inset:0; pointer-events:none; color:#fff; }
   #crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:22px; opacity:.8; text-shadow:0 0 3px #000; }
@@ -57,6 +58,16 @@
   #progresswrap { position:fixed; left:50%; top:56%; transform:translateX(-50%); width:80px; height:8px; background:#0008; border-radius:4px; display:none; }
   #progress { height:100%; width:0%; background:#fff; border-radius:4px; }
   #daytime { position:absolute; right:14px; top:12px; font-size:13px; color:#cde; text-shadow:1px 1px 0 #000; }
+
+  #touchui { position:absolute; inset:0; pointer-events:none; display:none; z-index:10; }
+  body.touch #touchui { display:block; }
+  #joy { position:absolute; left:22px; bottom:96px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.25); pointer-events:auto; }
+  #joyknob { position:absolute; left:38px; top:38px; width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,.3); }
+  #tbtns { position:absolute; right:18px; bottom:96px; display:flex; flex-direction:column; gap:12px; pointer-events:auto; }
+  .tbtn { width:62px; height:62px; border-radius:50%; background:rgba(0,0,0,.45); border:2px solid rgba(255,255,255,.4); color:#fff; font-size:26px; }
+  .tbtn:active { background:rgba(255,255,255,.35); }
+  #tbtns2 { position:absolute; right:96px; bottom:96px; display:flex; flex-direction:column; gap:12px; pointer-events:auto; }
+  body.touch #hotbar { pointer-events:auto; }
 </style>
 </head>
 <body>
@@ -109,6 +120,19 @@
 <img id="cursoritem"><div id="cursorcount"></div>
 <div id="tooltip"></div>
 
+<div id="touchui">
+  <div id="joy"><div id="joyknob"></div></div>
+  <div id="tbtns">
+    <button class="tbtn" id="tbreak">⛏</button>
+    <button class="tbtn" id="tplace">▣</button>
+  </div>
+  <div id="tbtns2">
+    <button class="tbtn" id="tjump">⤒</button>
+    <button class="tbtn" id="tinv">🎒</button>
+    <button class="tbtn" id="teat">🍖</button>
+  </div>
+</div>
+
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
 </script>
@@ -119,7 +143,10 @@ import * as THREE from 'three';
    VOXELHEIM — moteur voxel
    ============================================================ */
 
-const CHUNK = 16, HEIGHT = 64, RADIUS = 4;
+const CHUNK = 16, HEIGHT = 64;
+const IS_TOUCH = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+const RADIUS = IS_TOUCH ? 2 : 4;
+if (IS_TOUCH) document.body.classList.add('touch');
 
 /* ---------- Blocs ---------- */
 const B = {
@@ -305,11 +332,11 @@ for (const id of Object.keys(BLOCKS)){
 /* ---------- Maillage des chunks ---------- */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87b5e0);
-scene.fog = new THREE.Fog(0x87b5e0, 30, 90);
+scene.fog = new THREE.Fog(0x87b5e0, IS_TOUCH?14:30, IS_TOUCH?42:90);
 const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 300);
 const renderer = new THREE.WebGLRenderer({ antialias:false });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(IS_TOUCH ? 1 : Math.min(devicePixelRatio,2));
 document.getElementById('game').appendChild(renderer.domElement);
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 
@@ -371,10 +398,17 @@ function updateChunks(px,pz){
       scene.remove(c.mesh); c.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();}); c.mesh=null; c.dirty=true;
     }
   }
+  // construction progressive : 1 chunk par frame (2 sur desktop)
+  let budget = IS_TOUCH?1:2;
+  let best=null, bestd=1e9;
   for (let dx=-RADIUS;dx<=RADIUS;dx++) for (let dz=-RADIUS;dz<=RADIUS;dz++){
-    const c=getChunk(pcx+dx,pcz+dz);
-    if (c.dirty || !c.mesh) buildChunk(pcx+dx,pcz+dz);
+    const cx=pcx+dx, cz=pcz+dz;
+    const c=getChunk(cx,cz);
+    if (!c.dirty && c.mesh) continue;
+    const d=dx*dx+dz*dz;
+    if (d<bestd){ bestd=d; best=[cx,cz]; }
   }
+  if (best) buildChunk(best[0],best[1]);
 }
 
 /* ---------- Joueur ---------- */
@@ -415,12 +449,13 @@ document.addEventListener('pointerlockchange', ()=>{
   if (document.pointerLockElement===renderer.domElement) paused=false;
   else if (!invOpen) paused=true;
 });
-renderer.domElement.addEventListener('click', ()=>{ if(!invOpen && overlayHidden) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', ()=>{ if(!invOpen && overlayHidden && !IS_TOUCH) renderer.domElement.requestPointerLock(); });
 addEventListener('mousemove', e=>{
   if (document.pointerLockElement!==renderer.domElement) return;
   player.yaw -= e.movementX*0.0024;
   player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch - e.movementY*0.0024));
 });
+
 
 /* ---------- Raycast voxel (DDA) ---------- */
 function raycastBlock(maxDist=6){
@@ -717,6 +752,49 @@ function tryPlaceOrUse(){
   renderHotbar();
 }
 
+/* ---------- Contrôles tactiles ---------- */
+const touchMove = { x:0, y:0 };
+if (IS_TOUCH){
+  const joy=document.getElementById('joy'), knob=document.getElementById('joyknob');
+  let joyId=null, jc={x:0,y:0};
+  joy.addEventListener('touchstart', e=>{ const t=e.changedTouches[0]; joyId=t.identifier; const r=joy.getBoundingClientRect(); jc={x:r.left+r.width/2, y:r.top+r.height/2}; e.preventDefault(); }, {passive:false});
+  joy.addEventListener('touchmove', e=>{
+    for (const t of e.changedTouches) if (t.identifier===joyId){
+      let dx=(t.clientX-jc.x)/50, dy=(t.clientY-jc.y)/50;
+      const l=Math.hypot(dx,dy); if (l>1){ dx/=l; dy/=l; }
+      touchMove.x=dx; touchMove.y=dy;
+      knob.style.left=(38+dx*36)+'px'; knob.style.top=(38+dy*36)+'px';
+    }
+    e.preventDefault();
+  }, {passive:false});
+  const joyEnd = e=>{ for (const t of e.changedTouches) if (t.identifier===joyId){ joyId=null; touchMove.x=0; touchMove.y=0; knob.style.left='38px'; knob.style.top='38px'; } };
+  joy.addEventListener('touchend', joyEnd); joy.addEventListener('touchcancel', joyEnd);
+
+  // caméra : glisser sur l'écran (hors joystick/boutons)
+  let camId=null, lx=0, ly=0;
+  renderer.domElement.addEventListener('touchstart', e=>{ const t=e.changedTouches[0]; camId=t.identifier; lx=t.clientX; ly=t.clientY; }, {passive:true});
+  renderer.domElement.addEventListener('touchmove', e=>{
+    for (const t of e.changedTouches) if (t.identifier===camId){
+      player.yaw -= (t.clientX-lx)*0.006;
+      player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch - (t.clientY-ly)*0.006));
+      lx=t.clientX; ly=t.clientY;
+    }
+  }, {passive:true});
+  const camEnd = e=>{ for (const t of e.changedTouches) if (t.identifier===camId) camId=null; };
+  renderer.domElement.addEventListener('touchend', camEnd); renderer.domElement.addEventListener('touchcancel', camEnd);
+
+  // boutons
+  const hold=(el, on, off)=>{ el.addEventListener('touchstart', e=>{ e.preventDefault(); on(); }, {passive:false}); const end=()=>off&&off(); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end); };
+  hold(document.getElementById('tbreak'), ()=>mouseDown=true, ()=>{ mouseDown=false; breaking=null; progressWrap.style.display='none'; });
+  hold(document.getElementById('tjump'), ()=>keys.Space=true, ()=>keys.Space=false);
+  document.getElementById('tplace').addEventListener('touchstart', e=>{ e.preventDefault(); tryPlaceOrUse(); }, {passive:false});
+  document.getElementById('tinv').addEventListener('touchstart', e=>{ e.preventDefault(); if (!paused) invOpen ? closeInv() : openInv(false); }, {passive:false});
+  document.getElementById('teat').addEventListener('touchstart', e=>{ e.preventDefault(); if (!paused && !invOpen) eatSelected(); }, {passive:false});
+
+  // sélection hotbar au tap
+  for (let i=0;i<9;i++) hotbarEl.children[i].addEventListener('touchstart', e=>{ e.preventDefault(); hotbarSel=i; renderHotbar(); }, {passive:false});
+}
+
 /* ---------- Boucle ---------- */
 let last=performance.now(), timeOfDay=0;
 const dayEl=document.getElementById('daytime');
@@ -730,6 +808,7 @@ function tick(dt){
   if (keys.KeyS) move.sub(fwd);
   if (keys.KeyD) move.add(right);
   if (keys.KeyA||keys.KeyQ) move.sub(right);
+  if (touchMove.x||touchMove.y){ move.addScaledVector(fwd,-touchMove.y); move.addScaledVector(right,touchMove.x); }
   if (move.lengthSq()>0) move.normalize().multiplyScalar(speed*dt);
   player.vel.x=move.x; player.vel.z=move.z;
   if ((keys.Space) && player.onGround){ player.vel.y=8.2; player.onGround=false; }
@@ -801,16 +880,17 @@ document.getElementById('playbtn').addEventListener('click', ()=>{
   overlayHidden=true;
   // kit de départ
   if (!inv.some(s=>s)) { addToInv('bois_pickaxe',1); addToInv('bois_axe',1); addToInv('baie',5); }
-  renderer.domElement.requestPointerLock();
+  if (IS_TOUCH) paused=false; else renderer.domElement.requestPointerLock();
 });
 document.getElementById('respawnbtn').addEventListener('click', ()=>{
   document.getElementById('death').style.display='none';
   spawnPlayer(); renderBars(); paused=false;
-  renderer.domElement.requestPointerLock();
+  if (!IS_TOUCH) renderer.domElement.requestPointerLock();
 });
 
 renderHotbar(); renderBars(); renderInv();
 updateChunks(player.pos.x, player.pos.z);
+if ('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 loop();
 </script>
 </body>
