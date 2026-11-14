@@ -24,26 +24,40 @@
   canvas { display:block; touch-action:none; }
 
   #hud { position:absolute; inset:0; pointer-events:none; color:#fff; }
-  #crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:22px; opacity:.75; text-shadow:0 0 6px var(--aether); }
-  #daytime { position:absolute; right:14px; top:12px; font-size:13px; color:var(--aether-doux); text-shadow:0 0 8px rgba(127,223,255,.6); letter-spacing:1px; }
-  #bars { position:absolute; left:50%; bottom:92px; transform:translateX(-50%); display:flex; gap:34px; }
+  #crosshair { position:absolute; left:50%; top:50%; width:22px; height:22px; transform:translate(-50%,-50%); opacity:.85; filter:drop-shadow(0 0 5px rgba(127,223,255,.9)); }
+  #crosshair::before, #crosshair::after { content:''; position:absolute; background:rgba(235,248,255,.95); border-radius:2px; }
+  #crosshair::before { left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); clip-path:polygon(0 0,100% 0,100% 38%,0 38%,0 62%,100% 62%,100% 100%,0 100%); }
+  #crosshair::after { top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); clip-path:polygon(0 0,38% 0,38% 100%,0 100%,62% 0,100% 0,100% 100%,62% 100%); }
+  #daytime { position:absolute; right:14px; top:12px; font-size:13px; color:var(--aether-doux); text-shadow:0 0 8px rgba(127,223,255,.6); letter-spacing:1px; text-align:right; }
+  #biomename { font-size:11px; color:var(--luminite); letter-spacing:2px; text-transform:uppercase; opacity:.9; font-family:'Cinzel', serif; }
+  #bars { position:absolute; left:50%; bottom:96px; transform:translateX(-50%); display:flex; gap:40px; }
   .bar { width:180px; }
-  .bar-row { display:flex; gap:3px; }
-  .pip { width:15px; height:15px; border-radius:3px 3px 3px 0; background:rgba(10,14,30,.8); box-shadow:inset 0 0 0 1px rgba(127,223,255,.25); transform:skewX(-8deg); }
-  .pip.on.hp { background:linear-gradient(135deg,#ff8a8a,#c02830); box-shadow:0 0 6px rgba(255,90,90,.6); }
-  .pip.on.food { background:linear-gradient(135deg,#ffe08a,#c8882a); box-shadow:0 0 6px rgba(255,200,90,.5); }
-  #hotbar { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:5px; pointer-events:none; padding:6px; background:linear-gradient(180deg, rgba(13,18,38,.75), rgba(9,12,26,.85)); border:1px solid rgba(127,223,255,.28); border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,.5), inset 0 0 20px rgba(127,223,255,.06); }
+  .bar-label { text-align:center; font-size:13px; margin-bottom:4px; letter-spacing:4px; text-shadow:0 0 8px rgba(0,0,0,.8); }
+  .bar-label.hp { color:#ff9d9d; } .bar-label.food { color:#ffd98a; }
+  .bar-row { display:flex; gap:3px; justify-content:center; }
+  .pip { width:15px; height:15px; border-radius:3px 3px 3px 0; background:rgba(10,14,30,.8); box-shadow:inset 0 0 0 1px rgba(127,223,255,.25); transform:skewX(-8deg); transition:box-shadow .2s; }
+  .pip.on.hp { background:linear-gradient(135deg,#ff9d9d 20%,#e04a52 55%,#8a1420); box-shadow:0 0 8px rgba(255,90,90,.7), inset 0 1px 0 rgba(255,255,255,.45); }
+  .pip.on.food { background:linear-gradient(135deg,#ffe8a0 20%,#e0a040 55%,#8a5410); box-shadow:0 0 8px rgba(255,200,90,.6), inset 0 1px 0 rgba(255,255,255,.45); }
+  #hotbar { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:5px; pointer-events:none; padding:7px; background:linear-gradient(180deg, rgba(13,18,38,.78), rgba(9,12,26,.88)); border:1px solid rgba(127,223,255,.28); border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.55), inset 0 0 22px rgba(127,223,255,.07); }
   body.touch #hotbar { pointer-events:auto; }
-  .slot { width:52px; height:52px; background:linear-gradient(180deg, rgba(26,34,62,.9), rgba(13,18,38,.9)); border:1px solid rgba(127,223,255,.22); border-radius:8px; position:relative; }
-  .slot.selected { border-color:var(--luminite); box-shadow:0 0 12px rgba(255,217,122,.55), inset 0 0 10px rgba(255,217,122,.15); }
-  .slot img { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:40px; height:40px; image-rendering:pixelated; pointer-events:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+  .slot { width:54px; height:54px; background:linear-gradient(180deg, rgba(26,34,62,.9), rgba(13,18,38,.92)); border:1px solid rgba(127,223,255,.22); border-radius:9px; position:relative; transition:border-color .15s, box-shadow .15s; }
+  .slot .key { position:absolute; left:4px; top:2px; font-size:9px; color:rgba(143,160,189,.75); text-shadow:0 1px 2px #000; }
+  .slot.selected { border-color:var(--luminite); box-shadow:0 0 16px rgba(255,217,122,.6), inset 0 0 14px rgba(255,217,122,.18); transform:translateY(-3px); }
+  .slot img { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:42px; height:42px; image-rendering:pixelated; pointer-events:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
   .slot .count { position:absolute; right:4px; bottom:2px; font-size:13px; font-weight:bold; color:var(--texte); text-shadow:0 1px 2px #000; }
-  #itemname { position:absolute; left:50%; bottom:80px; transform:translateX(-50%); font-size:15px; color:var(--aether-doux); text-shadow:0 0 10px rgba(127,223,255,.5); opacity:.95; }
-  #toast { position:absolute; left:50%; top:16%; transform:translateX(-50%); max-width:82%; background:linear-gradient(180deg, rgba(19,26,51,.92), rgba(11,16,38,.92)); border:1px solid rgba(127,223,255,.4); border-radius:10px; padding:12px 18px; font-size:14px; line-height:1.5; text-align:center; color:var(--texte); box-shadow:0 0 24px rgba(127,223,255,.18); opacity:0; transition:opacity .4s; pointer-events:none; }
-  #progresswrap { position:fixed; left:50%; top:57%; transform:translateX(-50%); width:90px; height:9px; background:rgba(8,10,24,.8); border:1px solid rgba(127,223,255,.4); border-radius:5px; display:none; overflow:hidden; }
-  #progress { height:100%; width:0%; background:linear-gradient(90deg, var(--aether), var(--luminite)); box-shadow:0 0 8px var(--aether); }
+  @keyframes itemin { 0%{ opacity:0; transform:translateX(-50%) translateY(6px); } 100%{ opacity:.95; transform:translateX(-50%) translateY(0); } }
+  #itemname { position:absolute; left:50%; bottom:84px; transform:translateX(-50%); font-size:15px; color:var(--aether-doux); text-shadow:0 0 10px rgba(127,223,255,.5); opacity:.95; letter-spacing:.5px; }
+  #itemname.pop { animation:itemin .25s ease-out; }
+  #toast { position:absolute; left:50%; top:16%; transform:translateX(-50%); max-width:82%; background:linear-gradient(180deg, rgba(19,26,51,.94), rgba(11,16,38,.94)); border:1px solid rgba(127,223,255,.4); border-left:3px solid var(--luminite); border-radius:10px; padding:12px 18px; font-size:14px; line-height:1.5; text-align:center; color:var(--texte); box-shadow:0 0 24px rgba(127,223,255,.18), 0 8px 30px rgba(0,0,0,.5); opacity:0; transition:opacity .4s; pointer-events:none; }
+  #progresswrap { position:fixed; left:50%; top:57%; transform:translateX(-50%); width:110px; height:10px; background:rgba(8,10,24,.85); border:1px solid rgba(127,223,255,.45); border-radius:6px; display:none; overflow:hidden; box-shadow:0 0 14px rgba(127,223,255,.25); }
+  #progress { height:100%; width:0%; background:linear-gradient(90deg, var(--aether), var(--luminite)); box-shadow:0 0 10px var(--aether); transition:width .08s linear; }
 
   #vignette { position:absolute; inset:0; pointer-events:none; z-index:5; background:radial-gradient(ellipse at center, transparent 52%, rgba(4,7,18,.5) 100%); }
+  #waterveil { position:absolute; inset:0; pointer-events:none; z-index:6; opacity:0; transition:opacity .25s; background:linear-gradient(180deg, rgba(20,70,140,.45), rgba(8,35,80,.6)); box-shadow:inset 0 0 120px rgba(30,120,220,.5); }
+  #waterveil::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(115deg, transparent 0 26px, rgba(160,220,255,.07) 26px 30px); }
+  #hurtveil { position:absolute; inset:0; pointer-events:none; z-index:7; opacity:0; background:radial-gradient(ellipse at center, transparent 40%, rgba(190,20,30,.55) 100%); }
+  #hurtveil.show { animation:hurtflash .45s ease-out; }
+  @keyframes hurtflash { 0%{ opacity:1; } 100%{ opacity:0; } }
 
   @keyframes halo { 0%,100%{ text-shadow:0 0 30px rgba(127,223,255,.55), 0 0 60px rgba(127,223,255,.2); } 50%{ text-shadow:0 0 44px rgba(127,223,255,.85), 0 0 90px rgba(127,223,255,.35); } }
   @keyframes etoile { 0%,100%{ opacity:.4; } 50%{ opacity:1; } }
@@ -70,7 +84,8 @@
   .closebtn:active { background:#2a3f78; box-shadow:0 0 14px rgba(127,223,255,.4); }
   #cursoritem { position:fixed; width:36px; height:36px; pointer-events:none; z-index:50; display:none; image-rendering:pixelated; filter:drop-shadow(0 2px 4px rgba(0,0,0,.7)); }
   #cursorcount { position:fixed; z-index:51; color:var(--texte); font-weight:bold; font-size:13px; pointer-events:none; text-shadow:0 1px 2px #000; display:none; }
-  #tooltip { position:fixed; background:rgba(11,16,38,.95); border:1px solid rgba(127,223,255,.4); color:var(--aether-doux); padding:5px 10px; border-radius:6px; font-size:13px; pointer-events:none; z-index:60; display:none; box-shadow:0 0 12px rgba(127,223,255,.2); }
+  #tooltip { position:fixed; background:linear-gradient(180deg, rgba(19,26,51,.97), rgba(11,16,38,.97)); border:1px solid rgba(255,217,122,.45); color:var(--aether-doux); padding:6px 12px; border-radius:7px; font-size:13px; pointer-events:none; z-index:60; display:none; box-shadow:0 0 16px rgba(255,217,122,.18), 0 6px 18px rgba(0,0,0,.5); letter-spacing:.5px; }
+  #tooltip .tsub { display:block; font-size:10px; color:var(--texte2); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
 
   #lorepanel { background:linear-gradient(180deg, var(--panneau), var(--panneau2)); border:1px solid rgba(127,223,255,.4); border-radius:16px; padding:22px; width:min(680px, 92vw); max-height:88vh; overflow:auto; color:var(--texte); box-shadow:0 0 50px rgba(127,223,255,.18), 0 20px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); position:relative; }
   #lorepanel::after { content:''; position:absolute; inset:7px; border:1px solid rgba(127,223,255,.12); border-radius:11px; pointer-events:none; }
@@ -84,7 +99,7 @@
   #overlay::before { content:''; position:absolute; inset:16px; border:1px solid rgba(127,223,255,.22); border-radius:14px; pointer-events:none; }
   #overlay::after { content:''; position:absolute; inset:22px; border:1px solid rgba(255,217,122,.14); border-radius:10px; pointer-events:none; }
   #overlay.hidden { display:none; }
-  #overlay h1 { font-size:44px; letter-spacing:8px; color:var(--aether-doux); font-family:'Cinzel', serif; margin-bottom:6px; animation:halo 3.5s ease-in-out infinite; }
+  #overlay h1 { font-size:44px; letter-spacing:8px; font-family:'Cinzel', serif; margin-bottom:6px; background:linear-gradient(180deg, #eaf8ff 20%, var(--aether-doux) 55%, #4a8ec8); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 22px rgba(127,223,255,.45)); animation:halo 3.5s ease-in-out infinite; }
   #overlay .soustitre { color:var(--luminite); font-family:'Cinzel', serif; letter-spacing:3px; font-size:16px; margin-bottom:18px; text-shadow:0 0 14px rgba(255,217,122,.4); animation:etoile 4s ease-in-out infinite; }
   #overlay p { max-width:640px; line-height:1.65; margin-bottom:10px; font-size:15px; color:var(--texte2); }
   #overlay .btn { margin-top:16px; padding:13px 40px; font-size:18px; font-family:'Cinzel', serif; letter-spacing:2px; background:linear-gradient(180deg, #24407e, #16264e); color:#eaf6ff; border:1px solid rgba(127,223,255,.55); border-radius:10px; cursor:pointer; box-shadow:0 0 20px rgba(127,223,255,.25), inset 0 0 14px rgba(127,223,255,.12), inset 0 1px 0 rgba(255,255,255,.18); }
@@ -113,14 +128,16 @@
 <div id="game"></div>
 
 <div id="vignette"></div>
+<div id="waterveil"></div>
+<div id="hurtveil"></div>
 
 <div id="hud">
-  <div id="crosshair">+</div>
+  <div id="crosshair"></div>
   <div id="daytime"></div>
   <div id="toast"></div>
   <div id="bars">
-    <div class="bar"><div class="bar-row" id="hprow"></div></div>
-    <div class="bar"><div class="bar-row" id="foodrow"></div></div>
+    <div class="bar"><div class="bar-label hp">❤</div><div class="bar-row" id="hprow"></div></div>
+    <div class="bar"><div class="bar-label food">🍖</div><div class="bar-row" id="foodrow"></div></div>
   </div>
   <div id="itemname"></div>
   <div id="hotbar"></div>
