@@ -279,9 +279,9 @@ function buildMaterials(){
     const def=BLOCKS[id];
     const em = def.glow ? new THREE.Color(def.all[0]/255,def.all[1]/255,def.all[2]/255) : 0x000000;
     const ei = def.glow ? 0.6 : 0;
-    const top = new THREE.MeshLambertMaterial({ map: makeTexture(+id, def, 'top'), emissive:em, emissiveIntensity:ei });
-    const side = new THREE.MeshLambertMaterial({ map: makeTexture(+id, def, 'side'), emissive:em, emissiveIntensity:ei });
-    const bottom = new THREE.MeshLambertMaterial({ map: makeTexture(+id, def, 'side') });
+    const top = new THREE.MeshLambertMaterial({ map: makeTexture(+id, def, 'top'), emissive:em, emissiveIntensity:ei, vertexColors:true });
+    const side = new THREE.MeshLambertMaterial({ map: makeTexture(+id, def, 'side'), emissive:em, emissiveIntensity:ei, vertexColors:true });
+    const bottom = new THREE.MeshLambertMaterial({ map: makeTexture(+id, def, 'side'), vertexColors:true });
     blockMats[id] = [side, side, top, bottom, side, side];
   }
 }
@@ -304,6 +304,75 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(50,100,3
 const hemi = new THREE.HemisphereLight(0xbcd3ee, 0x4a3d2a, 0.6); scene.add(hemi);
 const amb = new THREE.AmbientLight(0x8aa2c8, 0.35); scene.add(amb);
 
+/* ---------- Ciel, astres, nuages, sélection, particules ---------- */
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: { topColor:{value:new THREE.Color(0x4a90c8)}, bottomColor:{value:new THREE.Color(0xc2dfef)} },
+  vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: 'uniform vec3 topColor; uniform vec3 bottomColor; varying vec3 vP; void main(){ float h = normalize(vP).y; gl_FragColor = vec4(mix(bottomColor, topColor, pow(max(h,0.0), 0.7)), 1.0); }',
+  side: THREE.BackSide, fog: false, depthWrite: false
+});
+const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(260, 24, 16), skyMat);
+skyMesh.renderOrder = -3; skyMesh.frustumCulled = false;
+scene.add(skyMesh);
+
+const starGeo = new THREE.BufferGeometry();
+{
+  const sp = [];
+  for (let i=0;i<350;i++){
+    const u=Math.random(), ph=Math.random()*Math.PI*2, r=240;
+    const s=Math.sqrt(Math.max(0,1-u*u));
+    sp.push(Math.cos(ph)*s*r, 20+u*r, Math.sin(ph)*s*r);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp,3));
+}
+const starsMat = new THREE.PointsMaterial({ color:0xdfeaff, size:1.7, sizeAttenuation:false, transparent:true, opacity:0, fog:false, depthWrite:false });
+const stars = new THREE.Points(starGeo, starsMat);
+stars.renderOrder = -2; stars.frustumCulled = false;
+scene.add(stars);
+
+function discTex(inner, outer){
+  const cv=document.createElement('canvas'); cv.width=cv.height=64;
+  const g=cv.getContext('2d');
+  const gr=g.createRadialGradient(32,32,4,32,32,32);
+  gr.addColorStop(0,inner); gr.addColorStop(.45,outer); gr.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=gr; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(cv);
+}
+const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:discTex('rgba(255,255,240,1)','rgba(255,220,140,.75)'), transparent:true, fog:false, depthWrite:false }));
+sunSprite.scale.set(46,46,1); sunSprite.renderOrder=-1; scene.add(sunSprite);
+const moonSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:discTex('rgba(235,245,255,1)','rgba(160,200,240,.7)'), transparent:true, fog:false, depthWrite:false }));
+moonSprite.scale.set(30,30,1); moonSprite.renderOrder=-1; scene.add(moonSprite);
+
+const clouds = [];
+{
+  const cloudMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.28, depthWrite:false, fog:false });
+  for (let i=0;i<16;i++){
+    const w=34+hash(i,1)*70, h2=22+hash(i,2)*44;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h2), cloudMat);
+    m.rotation.x = -Math.PI/2;
+    m.position.set(hash(i,3)*440-220, 92+hash(i,4)*10, hash(i,5)*440-220);
+    m.userData.vx = 0.5+hash(i,6)*0.9;
+    clouds.push(m); scene.add(m);
+  }
+}
+
+const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002,1.002,1.002)), new THREE.LineBasicMaterial({ color:0x7fdfff, transparent:true, opacity:0.85 }));
+scene.add(selBox);
+
+const particleGeo = new THREE.BoxGeometry(0.12,0.12,0.12);
+const particles = [];
+function spawnParticles(x,y,z,blockId){
+  const def=BLOCKS[blockId];
+  const base = def.all || def.side;
+  const col = (base[0]<<16)|(base[1]<<8)|base[2];
+  for (let i=0;i<10 && particles.length<90;i++){
+    const m = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({ color:col }));
+    m.position.set(x+0.15+Math.random()*0.7, y+0.15+Math.random()*0.7, z+0.15+Math.random()*0.7);
+    scene.add(m);
+    particles.push({ m, vx:(Math.random()-0.5)*3.5, vy:Math.random()*4.5, vz:(Math.random()-0.5)*3.5, life:0.75 });
+  }
+}
+
 const FACES = [
   { dir:[1,0,0],  corners:[[1,1,1],[1,0,1],[1,1,0],[1,0,0]] },
   { dir:[-1,0,0], corners:[[0,1,0],[0,0,0],[0,1,1],[0,0,1]] },
@@ -312,6 +381,7 @@ const FACES = [
   { dir:[0,0,1],  corners:[[0,1,1],[0,0,1],[1,1,1],[1,0,1]] },
   { dir:[0,0,-1], corners:[[1,1,0],[1,0,0],[0,1,0],[0,0,0]] },
 ];
+const FACE_TINT = [0.86, 0.86, 1.0, 0.6, 0.93, 0.93];
 const UV = [[0,1],[0,0],[1,1],[1,0]];
 
 function buildChunk(cx,cz){
@@ -324,14 +394,33 @@ function buildChunk(cx,cz){
     for (let f=0;f<6;f++){
       const d=FACES[f].dir;
       if (getBlock(ox+x+d[0], y+d[1], oz+z+d[2]) !== B.AIR) continue;
-      const g = (groups[b] ||= {pos:[],uv:[],nor:[],grps:[]});
+      const g = (groups[b] ||= {pos:[],uv:[],nor:[],col:[],grps:[]});
       const cs=FACES[f].corners;
       g.grps.push([g.pos.length/3, 6, f]);
+      // occlusion ambiante par sommet
+      const axis = d[0]!==0?0:(d[1]!==0?1:2);
+      const t1 = axis===0?1:0, t2 = axis===2?1:2;
+      const tint = FACE_TINT[f];
+      const ao = [];
+      for (let ci=0; ci<4; ci++){
+        const c=cs[ci];
+        const s1 = c[t1]===1?1:-1, s2 = c[t2]===1?1:-1;
+        const p=[ox+x+d[0], y+d[1], oz+z+d[2]];
+        const a1=[p[0],p[1],p[2]]; a1[t1]+=s1;
+        const a2=[p[0],p[1],p[2]]; a2[t2]+=s2;
+        const a3=[p[0],p[1],p[2]]; a3[t1]+=s1; a3[t2]+=s2;
+        const o1 = getBlock(a1[0],a1[1],a1[2])!==B.AIR ?1:0;
+        const o2 = getBlock(a2[0],a2[1],a2[2])!==B.AIR ?1:0;
+        const o3 = getBlock(a3[0],a3[1],a3[2])!==B.AIR ?1:0;
+        const v = (o1&&o2) ? 0 : 3-(o1+o2+o3);
+        ao.push((0.52+0.16*v)*tint);
+      }
       for (const i of [0,1,2, 2,1,3]){
         const p=cs[i];
         g.pos.push(ox+x+p[0], y+p[1], oz+z+p[2]);
         g.uv.push(UV[i][0], UV[i][1]);
         g.nor.push(d[0],d[1],d[2]);
+        g.col.push(ao[i],ao[i],ao[i]);
       }
     }
   }
@@ -342,6 +431,7 @@ function buildChunk(cx,cz){
     geo.setAttribute('position', new THREE.Float32BufferAttribute(g.pos,3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.uv,2));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(g.nor,3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(g.col,3));
     for (const [start,count,mi] of g.grps) geo.addGroup(start,count,mi);
     mesh.add(new THREE.Mesh(geo, blockMats[b]));
   }
@@ -745,6 +835,7 @@ function tryBreak(dt){
   progressWrap.style.display='block';
   progressEl.style.width=Math.min(100, breakProgress/need*100)+'%';
   if (breakProgress>=need){
+    spawnParticles(hit.x,hit.y,hit.z,hit.block);
     if (hit.block===B.COFFRE){
       grantPage();
       const r=hash(Date.now(), seed);
@@ -903,7 +994,7 @@ let last=performance.now(), timeOfDay = save?.time ?? 0.25;
 const dayEl=document.getElementById('daytime');
 function tick(dt){
   const sprinting = keys.ShiftLeft || sprintHeld;
-  const speed = (sprinting?1.6:1) * (player.speedBuff>0?1.4:1) * 5.6;
+  const speed = (sprinting?1.8:1) * (player.speedBuff>0?1.4:1) * 8.4;
   const fwd=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
   const right=new THREE.Vector3(-fwd.z,0,fwd.x);
   const move=new THREE.Vector3();
@@ -914,8 +1005,8 @@ function tick(dt){
   if (touchMove.x||touchMove.y){ move.addScaledVector(fwd,-touchMove.y); move.addScaledVector(right,touchMove.x); }
   if (move.lengthSq()>0) move.normalize().multiplyScalar(speed*dt);
   player.vel.x=move.x; player.vel.z=move.z;
-  if (keys.Space && player.onGround){ player.vel.y=8.2; player.onGround=false; }
-  player.vel.y-=25*dt; if (player.vel.y<-40)player.vel.y=-40;
+  if (keys.Space && player.onGround){ player.vel.y=9.2; player.onGround=false; }
+  player.vel.y-=30*dt; if (player.vel.y<-52)player.vel.y=-52;
 
   const p=player.pos;
   let nx=p.x+player.vel.x*dt;
@@ -950,12 +1041,42 @@ function tick(dt){
   timeOfDay=(timeOfDay+dt/300)%1;
   const dayness = Math.max(0, Math.sin(timeOfDay*Math.PI*2));
   const dusk = Math.max(0, 1-Math.abs(dayness)*4);
-  const sky = new THREE.Color(0x0a1030).lerp(new THREE.Color(0x87b5e0), Math.min(1, dayness*1.3));
-  if (dusk>0) sky.lerp(new THREE.Color(0xd88a5a), dusk*0.45);
-  scene.background=sky; scene.fog.color=sky;
+  const zenith = new THREE.Color(0x0a1030).lerp(new THREE.Color(0x4a90c8), Math.min(1, dayness*1.3));
+  const horizonC = new THREE.Color(0x141c3e).lerp(new THREE.Color(0xc2dfef), Math.min(1, dayness*1.3));
+  if (dusk>0){ zenith.lerp(new THREE.Color(0x7a3a30), dusk*0.35); horizonC.lerp(new THREE.Color(0xd8855a), dusk*0.6); }
+  skyMat.uniforms.topColor.value.copy(zenith);
+  skyMat.uniforms.bottomColor.value.copy(horizonC);
+  scene.fog.color.copy(horizonC);
+  const ang = timeOfDay*Math.PI*2;
+  sun.position.set(Math.cos(ang)*100, Math.max(12, Math.sin(ang)*100), 40);
   sun.intensity=0.12+dayness*1.35;
   sun.color.setRGB(1, 0.95-dayness*0.05+dusk*0.05, 0.88-dayness*0.1+dusk*0.15);
   hemi.intensity=0.18+dayness*0.55; amb.intensity=0.22+dayness*0.3;
+  skyMesh.position.copy(camera.position);
+  stars.position.copy(camera.position);
+  starsMat.opacity = Math.max(0, 1-dayness*1.7)*0.9;
+  sunSprite.position.set(camera.position.x+Math.cos(ang)*210, camera.position.y+Math.sin(ang)*210, camera.position.z-70);
+  moonSprite.position.set(camera.position.x-Math.cos(ang)*210, camera.position.y-Math.sin(ang)*210, camera.position.z+70);
+  sunSprite.material.opacity = Math.max(0, Math.min(1, Math.sin(ang)*2+0.4));
+  moonSprite.material.opacity = Math.max(0, Math.min(1, -Math.sin(ang)*2+0.4));
+  for (const m of clouds){
+    m.position.x += m.userData.vx*dt;
+    if (m.position.x - camera.position.x > 240) m.position.x -= 480;
+    if (m.position.x - camera.position.x < -240) m.position.x += 480;
+    if (m.position.z - camera.position.z > 240) m.position.z -= 480;
+    if (m.position.z - camera.position.z < -240) m.position.z += 480;
+  }
+  const selHit = raycastBlock();
+  if (selHit && !invOpen){ selBox.visible=true; selBox.position.set(selHit.x+0.5, selHit.y+0.5, selHit.z+0.5); }
+  else selBox.visible=false;
+  for (let i=particles.length-1;i>=0;i--){
+    const P=particles[i];
+    P.life-=dt;
+    P.vy-=12*dt;
+    P.m.position.x+=P.vx*dt; P.m.position.y+=P.vy*dt; P.m.position.z+=P.vz*dt;
+    P.m.scale.setScalar(Math.max(0.1,P.life*1.3));
+    if (P.life<=0){ scene.remove(P.m); P.m.material.dispose(); particles.splice(i,1); }
+  }
   const hh=Math.floor(timeOfDay*24), mm=Math.floor((timeOfDay*24%1)*60);
   dayEl.textContent=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')} — ${dayness>0.15?'Jour':'Nuit'}`;
 }
