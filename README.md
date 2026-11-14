@@ -1,30 +1,32 @@
-# Voxelheim — Les Fragments d'Aethérium
+# Voxelheim 2 — Les Chroniques de l'Éveil
 
-Jeu voxel de type Minecraft, 100% HTML/JS (three.js chargé via CDN). Ouvrir `index.html` dans un navigateur, ou jouer en ligne via GitHub Pages.
+Jeu voxel d'aventure et de construction, 100% web (three.js via CDN), **installable comme application Android** (PWA).
 
 ## Lore
-Le Cœur d'Aethérium, cristal qui maintenait l'équilibre de Voxelheim, a volé en éclats. Toi, dernier Éveillé, récolte les fragments pour rallumer les lanternes du monde.
+Le Cœur d'Aethérium est brisé. Dernier Éveillé, explore les biomes, fouille les ruines des Anciens, collecte les 8 Chroniques dans leurs Caches, et offre 8 Éclats d'Aethérium à un Autel pour faire renaître le Cœur.
 
-## Contrôles (clavier)
-- ZQSD/WASD : bouger · Espace : sauter · Shift : sprint
-- Clic gauche : casser · Clic droit : poser/utiliser
-- Molette ou 1-9 : objet sélectionné · E : sac & craft 2×2 · clic droit sur l'Établi : craft 3×3 · F : manger
-
-## Contrôles (tactile / tablette)
-- Joystick gauche : bouger · glisser sur l'écran : caméra
-- ⛏ : casser (maintenir) · ▣ : poser/utiliser · ⤒ : sauter · 🎒 : sac · 🍖 : manger
+## Contrôles tactiles (Android/tablette)
+- Zone gauche de l'écran : joystick dynamique (se déplacer)
+- Glisser à droite : caméra · tap court : poser · appui long : casser
+- Boutons : ⛏ casser · ▣ poser/utiliser · ⤒ sauter · 🎒 sac · 🍖 manger · 📜 chroniques · 💾 sauvegarder
 - Toucher un slot de la barre : sélection de l'objet
 
-## Installation comme application (PWA)
-1. Activer GitHub Pages (Settings → Pages → branche main)
-2. Ouvrir l'URL du site dans Chrome
-3. Menu → « Installer l'application » / « Ajouter à l'écran d'accueil »
+## Contrôles clavier
+ZQSD/WASD · Espace · Shift sprint · clic gauche casser · clic droit poser/utiliser · molette/1-9 sélection · E sac · L chroniques · F manger
 
-Le jeu fonctionne ensuite hors-ligne et en plein écran, comme une vraie app.
+## Installation comme app (Android)
+1. Activer GitHub Pages : Settings → Pages → branche `main` / (root)
+2. Ouvrir le site dans Chrome → menu ⋮ → **« Installer l'application »**
+3. Le jeu s'installe avec son icône, plein écran, et fonctionne **hors-ligne** (service worker)
 
 ## Contenu
-- Monde infini procédural, cycle jour/nuit, 14 blocs custom (Luminite, Aethérium, Ferrostem…)
-- 16 outils (pioche, hache, pelle, lame × 4 matériaux), table de craft 3×3, ~20 recettes
-- Consommables originaux : Baie de Sylve, Tarte aux Baies, Ragoût des Anciens, Élixir d'Aethérium
-- Vie, faim, dégâts de chute, écran de mort
-- Qualité adaptative : construction progressive des chunks et rendu allégé sur mobile/tablette
+- 4 biomes : Plaines de Velours, Forêt de Sylve, Dunes d'Étoile, Pics d'Ancre (+ l'Abîme du Vide en profondeur)
+- 22 blocs, 17 outils, ~30 recettes, 6 consommables originaux
+- Ruines des Anciens avec Caches à Chroniques, autels, quête finale du Cœur d'Aethérium
+- **Sauvegarde automatique du monde** (blocs modifiés, inventaire, position, chroniques)
+- Cycle jour/nuit, faim, vie, dégâts de chute, régénération du Cœur
+- Qualité adaptative tablette : chunks progressifs, rendu allégé
+
+## Fichiers
+- `index.html` — interface · `engine.js` — moteur · `content.js` — contenu/lore
+- `manifest.json`, `sw.js`, `icon.svg` — installation PWA
