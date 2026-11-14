@@ -1,7 +1,7 @@
 {
-  "name": "Voxelheim — Les Fragments d'Aethérium",
-  "short_name": "Voxelheim",
-  "description": "Jeu voxel d'aventure et de construction",
+  "name": "Voxelheim 2 — Les Chroniques de l'Éveil",
+  "short_name": "Voxelheim 2",
+  "description": "Jeu voxel d'aventure, de construction et de lore",
   "start_url": ".",
   "scope": ".",
   "display": "fullscreen",
