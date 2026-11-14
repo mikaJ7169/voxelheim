@@ -7,7 +7,7 @@ export const B = {
   AIR:0, VELOUR:1, HUMUS:2, ANCRE:3, GRANIT:4, TRONC:5, FEUILLAGE:6,
   PLANCHES:7, SABLE:8, EPINE:9, GIVRE:10, LUMINITE:11, AETHERIUM:12,
   FERROSTEM:13, VIDE:14, ETABLI:15, LANTERNE:16, CRISTAL:17, CHAMPI:18,
-  BRIQUE:19, COFFRE:20, AUTEL:21, PONT:22
+  BRIQUE:19, COFFRE:20, AUTEL:21, PONT:22, EAU:23
 };
 
 /* def: nom, dureté, outil, couleurs, options */
@@ -33,7 +33,8 @@ export const BLOCKS = {
   [B.BRIQUE]:    { name:'Brique des Anciens', hard:3.2, tool:'pickaxe', all:[140,120,100] },
   [B.COFFRE]:    { name:'Cache des Anciens', hard:1.2, tool:null, all:[130,95,60], spots:[255,215,120] },
   [B.AUTEL]:     { name:'Autel d\'Aethérium', hard:5.0, tool:'pickaxe', all:[70,75,95], spots:[110,230,255], glow:true },
-  [B.PONT]:      { name:'Verre du Vide', hard:2.0, tool:null, all:[180,200,230], glow:true }
+  [B.PONT]:      { name:'Verre du Vide', hard:2.0, tool:null, all:[180,200,230], glow:true },
+  [B.EAU]:       { name:'Eau d\'Aethérium', hard:Infinity, tool:null, all:[45,105,185], water:true }
 };
 
 export const ITEMS = {
