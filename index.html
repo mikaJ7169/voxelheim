@@ -87,6 +87,29 @@
   #tooltip { position:fixed; background:linear-gradient(180deg, rgba(19,26,51,.97), rgba(11,16,38,.97)); border:1px solid rgba(255,217,122,.45); color:var(--aether-doux); padding:6px 12px; border-radius:7px; font-size:13px; pointer-events:none; z-index:60; display:none; box-shadow:0 0 16px rgba(255,217,122,.18), 0 6px 18px rgba(0,0,0,.5); letter-spacing:.5px; }
   #tooltip .tsub { display:block; font-size:10px; color:var(--texte2); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
 
+  #fpscounter { position:absolute; left:14px; top:12px; font-size:13px; color:var(--aether-doux); text-shadow:0 0 8px rgba(127,223,255,.6); letter-spacing:1px; display:none; }
+  #fpscounter b { color:var(--luminite); }
+  #setbtn { position:absolute; right:14px; top:44px; width:34px; height:34px; border-radius:9px; pointer-events:auto; cursor:pointer; text-align:center; line-height:34px; font-size:17px; color:var(--aether-doux); background:linear-gradient(180deg, rgba(26,34,62,.85), rgba(13,18,38,.9)); border:1px solid rgba(127,223,255,.35); box-shadow:0 3px 10px rgba(0,0,0,.4), inset 0 0 10px rgba(127,223,255,.08); }
+  #setbtn:hover { border-color:var(--aether); box-shadow:0 0 14px rgba(127,223,255,.35); }
+
+  #setscreen { position:absolute; inset:0; background:rgba(5,8,20,.72); display:none; align-items:center; justify-content:center; z-index:16; backdrop-filter:blur(3px); }
+  #setscreen.open { display:flex; }
+  #setpanel { background:linear-gradient(180deg, var(--panneau), var(--panneau2)); border:1px solid rgba(127,223,255,.4); border-radius:16px; padding:22px; width:min(560px, 94vw); max-height:88vh; overflow:auto; color:var(--texte); box-shadow:0 0 50px rgba(127,223,255,.18), 0 20px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); position:relative; }
+  #setpanel::after { content:''; position:absolute; inset:7px; border:1px solid rgba(127,223,255,.12); border-radius:11px; pointer-events:none; }
+  #setpanel h2 { color:var(--aether-doux); margin-bottom:14px; letter-spacing:3px; font-family:'Cinzel', serif; text-align:center; text-shadow:0 0 18px rgba(127,223,255,.5); }
+  .setgroup { margin-bottom:16px; background:linear-gradient(180deg, rgba(24,32,60,.6), rgba(13,18,38,.6)); border:1px solid rgba(127,223,255,.18); border-radius:10px; padding:12px 14px; }
+  .setgroup h3 { color:var(--luminite); font-size:12px; letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; font-family:'Cinzel', serif; text-shadow:0 0 10px rgba(255,217,122,.4); }
+  .setrow { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0; font-size:14px; }
+  .setrow label { color:var(--texte); }
+  .setrow .val { color:var(--aether-doux); font-size:12px; min-width:38px; text-align:right; }
+  .setrow select, .setrow input[type=checkbox] { accent-color:var(--luminite); }
+  .setrow select { background:rgba(11,16,38,.95); color:var(--texte); border:1px solid rgba(127,223,255,.35); border-radius:6px; padding:4px 8px; font-size:13px; }
+  .setrow input[type=range] { width:150px; accent-color:var(--aether); }
+  .keyrow { display:flex; align-items:center; justify-content:space-between; padding:5px 0; font-size:14px; }
+  .keyrow button { min-width:110px; padding:5px 10px; background:linear-gradient(180deg, #1c2a52, #131c3c); color:var(--aether-doux); border:1px solid rgba(127,223,255,.4); border-radius:6px; font-size:12px; letter-spacing:1px; cursor:pointer; }
+  .keyrow button:hover { border-color:var(--aether); box-shadow:0 0 10px rgba(127,223,255,.3); }
+  .keyrow button.listen { border-color:var(--luminite); color:var(--luminite); animation:etoile 1s ease-in-out infinite; }
+
   #lorepanel { background:linear-gradient(180deg, var(--panneau), var(--panneau2)); border:1px solid rgba(127,223,255,.4); border-radius:16px; padding:22px; width:min(680px, 92vw); max-height:88vh; overflow:auto; color:var(--texte); box-shadow:0 0 50px rgba(127,223,255,.18), 0 20px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); position:relative; }
   #lorepanel::after { content:''; position:absolute; inset:7px; border:1px solid rgba(127,223,255,.12); border-radius:11px; pointer-events:none; }
   #lorepanel h2 { color:var(--aether-doux); margin-bottom:16px; letter-spacing:3px; font-family:'Cinzel', serif; text-align:center; text-shadow:0 0 18px rgba(127,223,255,.5); }
@@ -134,6 +157,8 @@
 <div id="hud">
   <div id="crosshair"></div>
   <div id="daytime"></div>
+  <div id="fpscounter">FPS <b id="fpsval">--</b></div>
+  <div id="setbtn">⚙</div>
   <div id="toast"></div>
   <div id="bars">
     <div class="bar"><div class="bar-label hp">❤</div><div class="bar-row" id="hprow"></div></div>
@@ -156,6 +181,57 @@
     <div id="invgrid" class="grid g9"></div>
     <div class="orn">✦</div>
     <button class="closebtn" id="invclose">Fermer</button>
+  </div>
+</div>
+
+<div id="setscreen">
+  <div id="setpanel">
+    <h2>⚙ Réglages</h2>
+    <div class="setgroup">
+      <h3>Affichage</h3>
+      <div class="setrow"><label>Définition</label>
+        <select id="s_res">
+          <option value="native">Native</option>
+          <option value="1440p">1440p</option>
+          <option value="1080p">1080p</option>
+        </select></div>
+      <div class="setrow"><label>Distance de rendu</label>
+        <span style="display:flex;align-items:center;gap:8px"><input type="range" id="s_dist" min="2" max="8" step="1"><span class="val" id="s_dist_v"></span></span></div>
+      <div class="setrow"><label>Champ de vision</label>
+        <span style="display:flex;align-items:center;gap:8px"><input type="range" id="s_fov" min="60" max="100" step="1"><span class="val" id="s_fov_v"></span></span></div>
+      <div class="setrow"><label>Ombres</label>
+        <select id="s_shadow">
+          <option value="high">Élevées</option>
+          <option value="low">Légères</option>
+          <option value="off">Désactivées</option>
+        </select></div>
+      <div class="setrow"><label>Lueur HDR (bloom)</label><input type="checkbox" id="s_bloom"></div>
+      <div class="setrow"><label>Nuages</label><input type="checkbox" id="s_clouds"></div>
+      <div class="setrow"><label>Particules</label>
+        <select id="s_particles">
+          <option value="high">Nombreuses</option>
+          <option value="low">Réduites</option>
+          <option value="off">Aucune</option>
+        </select></div>
+      <div class="setrow"><label>Poussière d'Aethérium</label><input type="checkbox" id="s_motes"></div>
+    </div>
+    <div class="setgroup">
+      <h3>Performance</h3>
+      <div class="setrow"><label>Limite d'images par seconde</label>
+        <select id="s_fps">
+          <option value="0">Illimitée</option>
+          <option value="30">30 FPS</option>
+          <option value="60">60 FPS</option>
+          <option value="120">120 FPS</option>
+        </select></div>
+      <div class="setrow"><label>Compteur FPS</label><input type="checkbox" id="s_fpsshow"></div>
+    </div>
+    <div class="setgroup">
+      <h3>Contrôles</h3>
+      <div id="keylist"></div>
+    </div>
+    <div class="orn">✦</div>
+    <button class="closebtn" id="setclose">Fermer</button>
   </div>
 </div>
 
@@ -199,6 +275,7 @@
     <button class="tbtn" id="tinv">🎒</button>
     <button class="tbtn" id="teat">🍖</button>
     <button class="tbtn" id="tlore">📜</button>
+    <button class="tbtn" id="tset">⚙</button>
     <button class="tbtn" id="tsave">💾</button>
   </div>
 </div>
@@ -207,7 +284,10 @@
 <div id="tooltip"></div>
 
 <script type="importmap">
-{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
 </script>
 <script type="module" src="engine.js"></script>
 </body>

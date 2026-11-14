@@ -3,11 +3,28 @@
    Moteur : monde, rendu, joueur, tactile (Pointer Events), sauvegarde
    ============================================================ */
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { B, BLOCKS, ITEMS, RECIPES, defaultKey, BIOMES, PAGES, TOOL_TYPES, TOOL_MATS } from './content.js';
+
+/* ---------- Réglages ---------- */
+const SET_KEY = 'voxelheim2_settings';
+const DEFAULT_KEYS = {
+  forward:['KeyW','KeyZ'], back:['KeyS'], left:['KeyA','KeyQ'], right:['KeyD'],
+  jump:['Space'], sprint:['ShiftLeft'], inv:['KeyE'], lore:['KeyL'], eat:['KeyF']
+};
+const settings = Object.assign({
+  res:'native', dist:0, fov:72, shadows:'high', bloom:true, clouds:true,
+  particles:'high', motes:true, fpsCap:0, showFps:false, keys:{}
+}, (()=>{ try { return JSON.parse(localStorage.getItem(SET_KEY)) || {}; } catch(e){ return {}; } })());
+settings.keys = Object.assign({}, DEFAULT_KEYS, settings.keys || {});
+function saveSettings(){ try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch(e){} }
 
 const CHUNK = 16, HEIGHT = 64;
 const IS_TOUCH = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
-const RADIUS = IS_TOUCH ? 2 : 5;
+let RADIUS = settings.dist || (IS_TOUCH ? 2 : 5);
 const SEA = 13;
 const SAVE_KEY = 'voxelheim2_save';
 
@@ -304,13 +321,14 @@ function makeWaterTexture(){
   t.colorSpace=THREE.SRGBColorSpace;
   return t;
 }
+let waterMat = null;
 function buildMaterials(){
   for (const id of Object.keys(BLOCKS)){
     const def=BLOCKS[id];
     if (def.water){
       waterTex = makeWaterTexture();
-      const wm = new THREE.MeshLambertMaterial({ map:waterTex, transparent:true, opacity:0.74, vertexColors:true, depthWrite:false, emissive:new THREE.Color(0x0a2038), emissiveIntensity:0.4 });
-      blockMats[id] = [wm,wm,wm,wm,wm,wm];
+      waterMat = new THREE.MeshLambertMaterial({ map:waterTex, transparent:true, opacity:0.74, vertexColors:true, depthWrite:false, emissive:new THREE.Color(0x0a2038), emissiveIntensity:0.4 });
+      blockMats[id] = [waterMat,waterMat,waterMat,waterMat,waterMat,waterMat];
       continue;
     }
     const em = def.glow ? new THREE.Color(def.all[0]/255,def.all[1]/255,def.all[2]/255) : 0x000000;
@@ -336,7 +354,26 @@ renderer.toneMappingExposure = 1.15;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.getElementById('game').appendChild(renderer.domElement);
-addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.32, 0.55, 0.82);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+function applyResolution(){
+  const cap = settings.res==='1080p' ? 1080 : settings.res==='1440p' ? 1440 : Infinity;
+  const pr = Math.min(devicePixelRatio, settings.res==='native' ? (IS_TOUCH?1.5:2) : cap/innerHeight);
+  renderer.setPixelRatio(pr);
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setPixelRatio(pr);
+  composer.setSize(innerWidth, innerHeight);
+}
+function applyShadows(){
+  sun.castShadow = settings.shadows!=='off';
+  const s = settings.shadows==='high' ? 2048 : 1024;
+  sun.shadow.mapSize.set(s,s);
+  if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; }
+}
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); applyResolution(); });
 
 const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(50,100,30); scene.add(sun); scene.add(sun.target);
 sun.castShadow = true;
@@ -427,6 +464,19 @@ function cloudTex(seedVal){
     clouds.push(m); scene.add(m);
   }
 }
+function applyClouds(){ for (const m of clouds) m.visible = settings.clouds; }
+
+/* Poussière d'Aethérium en suspension */
+const moteGeo = new THREE.BufferGeometry();
+{
+  const mp=[]; const N=280;
+  for (let i=0;i<N;i++) mp.push((Math.random()-0.5)*46, Math.random()*26-9, (Math.random()-0.5)*46);
+  moteGeo.setAttribute('position', new THREE.Float32BufferAttribute(mp,3));
+}
+const moteMat = new THREE.PointsMaterial({ map:starTex, color:0x9fe8ff, size:0.13, sizeAttenuation:true, transparent:true, opacity:0.5, depthWrite:false, blending:THREE.AdditiveBlending, fog:false });
+const motes = new THREE.Points(moteGeo, moteMat);
+motes.frustumCulled=false; scene.add(motes);
+function applyParticles(){ motes.visible = settings.motes && settings.particles!=='off'; }
 
 const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002,1.002,1.002)), new THREE.LineBasicMaterial({ color:0x7fdfff, transparent:true, opacity:0.85 }));
 scene.add(selBox);
@@ -439,7 +489,9 @@ function spawnParticles(x,y,z,blockId){
   const def=BLOCKS[blockId];
   const base = def.all || def.side;
   const col = (base[0]<<16)|(base[1]<<8)|base[2];
-  for (let i=0;i<14 && particles.length<120;i++){
+  const PN = settings.particles==='high' ? 14 : settings.particles==='low' ? 7 : 0;
+  const PMAX = settings.particles==='high' ? 120 : 60;
+  for (let i=0;i<PN && particles.length<PMAX;i++){
     const m = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({ color:col }));
     m.position.set(x+0.15+Math.random()*0.7, y+0.15+Math.random()*0.7, z+0.15+Math.random()*0.7);
     m.rotation.set(Math.random()*3, Math.random()*3, 0);
@@ -1005,13 +1057,34 @@ function useAltar(){
 
 /* ---------- Entrées clavier/souris (desktop) ---------- */
 const keys = {};
+const down = a => (settings.keys[a] || []).some(c=>keys[c]);
+const setscreen=document.getElementById('setscreen');
+let setOpen=false, listeningAct=null;
+function openSettings(){
+  setOpen=true; setscreen.classList.add('open'); document.exitPointerLock();
+  if (IS_TOUCH) paused=true;
+  renderKeybinds();
+}
+function closeSettings(){
+  setOpen=false; listeningAct=null; setscreen.classList.remove('open'); saveSettings();
+  if (IS_TOUCH) paused=false;
+  else if (!invOpen && !lorescreen.classList.contains('open')) renderer.domElement.requestPointerLock();
+}
 addEventListener('keydown', e=>{
+  if (listeningAct){
+    e.preventDefault();
+    if (e.code!=='Escape'){ settings.keys[listeningAct]=[e.code]; saveSettings(); }
+    listeningAct=null; renderKeybinds();
+    return;
+  }
   keys[e.code]=true;
-  if (e.code==='KeyE'){ if (!paused) invOpen ? closeInv() : openInv(false); }
-  if (e.code==='KeyL' && !paused && !invOpen) openLore();
-  if (e.code==='KeyF' && !paused && !invOpen) eatSelected();
+  if (e.code==='Escape' && !invOpen){ if (setOpen) closeSettings(); else openSettings(); }
+  if (isBound('inv',e.code) && !setOpen){ if (!paused) invOpen ? closeInv() : openInv(false); }
+  if (isBound('lore',e.code) && !paused && !invOpen && !setOpen) openLore();
+  if (isBound('eat',e.code) && !paused && !invOpen && !setOpen) eatSelected();
   if (e.code.startsWith('Digit')){ const n=+e.code.slice(5); if(n>=1&&n<=9){ hotbarSel=n-1; renderHotbar(); } }
 });
+const isBound = (act,code)=> (settings.keys[act] || []).includes(code);
 addEventListener('keyup', e=>keys[e.code]=false);
 addEventListener('wheel', e=>{ if(!paused&&!invOpen){ hotbarSel=(hotbarSel+(e.deltaY>0?1:8))%9; renderHotbar(); }});
 document.addEventListener('pointerlockchange', ()=>{
@@ -1097,18 +1170,64 @@ if (IS_TOUCH){
     el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
   };
   bindHold('tbreak', ()=>breakingHeld=true, ()=>{ breakingHeld=false; breaking=null; progressWrap.style.display='none'; });
-  bindHold('tjump', ()=>keys.Space=true, ()=>keys.Space=false);
+  bindHold('tjump', ()=>keys.TouchJump=true, ()=>keys.TouchJump=false);
   bindHold('tsprint', ()=>sprintHeld=true, ()=>sprintHeld=false);
   document.getElementById('tplace').addEventListener('pointerdown', e=>{ e.preventDefault(); tryPlaceOrUse(); }, {passive:false});
   document.getElementById('tinv').addEventListener('pointerdown', e=>{ e.preventDefault(); if (!paused) invOpen ? closeInv() : openInv(false); }, {passive:false});
   document.getElementById('teat').addEventListener('pointerdown', e=>{ e.preventDefault(); if (!paused && !invOpen) eatSelected(); }, {passive:false});
   document.getElementById('tlore').addEventListener('pointerdown', e=>{ e.preventDefault(); openLore(); }, {passive:false});
+  document.getElementById('tset').addEventListener('pointerdown', e=>{ e.preventDefault(); if (setOpen) closeSettings(); else openSettings(); }, {passive:false});
   document.getElementById('tsave').addEventListener('pointerdown', e=>{ e.preventDefault(); persist(); toast('💾 Monde sauvegardé'); }, {passive:false});
 
   for (let i=0;i<9;i++){
     const idx2=i;
     hotbarEl.children[i].addEventListener('pointerdown', e=>{ e.preventDefault(); hotbarSel=idx2; renderHotbar(); }, {passive:false});
   }
+}
+
+/* ---------- Réglages : interface ---------- */
+const ACT_LABELS = { forward:'Avancer', back:'Reculer', left:'Vers la gauche', right:'Vers la droite', jump:'Sauter / nager', sprint:'Sprint', inv:'Ouvrir le sac', lore:'Chroniques', eat:'Manger' };
+function keyLabel(c){
+  return ({Space:'Espace', ShiftLeft:'Maj ⇧', ShiftRight:'Maj ⇧', ControlLeft:'Ctrl', ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→'})[c] || c.replace(/^Key|^Digit/, '');
+}
+function renderKeybinds(){
+  const kl=document.getElementById('keylist'); kl.innerHTML='';
+  for (const act of Object.keys(ACT_LABELS)){
+    const row=document.createElement('div'); row.className='keyrow';
+    const codes=(settings.keys[act]||[]).map(keyLabel).join(' / ') || '—';
+    const listening = listeningAct===act;
+    row.innerHTML=`<span>${ACT_LABELS[act]}</span><button>${listening?'Appuie sur une touche…':codes}</button>`;
+    const btn=row.querySelector('button');
+    if (listening) btn.classList.add('listen');
+    btn.addEventListener('click', ()=>{ listeningAct=act; renderKeybinds(); });
+    kl.appendChild(row);
+  }
+}
+function applyShowFps(){ document.getElementById('fpscounter').style.display = settings.showFps?'block':'none'; }
+function bindSettingsUI(){
+  const $=id=>document.getElementById(id);
+  $('s_res').value=settings.res;
+  $('s_res').addEventListener('change', e=>{ settings.res=e.target.value; saveSettings(); applyResolution(); });
+  $('s_dist').value=RADIUS; $('s_dist_v').textContent=RADIUS;
+  $('s_dist').addEventListener('input', e=>{ RADIUS=+e.target.value; settings.dist=RADIUS; $('s_dist_v').textContent=RADIUS; saveSettings(); });
+  $('s_fov').value=settings.fov; $('s_fov_v').textContent=settings.fov;
+  $('s_fov').addEventListener('input', e=>{ settings.fov=+e.target.value; $('s_fov_v').textContent=settings.fov; saveSettings(); });
+  $('s_shadow').value=settings.shadows;
+  $('s_shadow').addEventListener('change', e=>{ settings.shadows=e.target.value; saveSettings(); applyShadows(); });
+  $('s_bloom').checked=settings.bloom;
+  $('s_bloom').addEventListener('change', e=>{ settings.bloom=e.target.checked; saveSettings(); });
+  $('s_clouds').checked=settings.clouds;
+  $('s_clouds').addEventListener('change', e=>{ settings.clouds=e.target.checked; saveSettings(); applyClouds(); });
+  $('s_particles').value=settings.particles;
+  $('s_particles').addEventListener('change', e=>{ settings.particles=e.target.value; saveSettings(); applyParticles(); });
+  $('s_motes').checked=settings.motes;
+  $('s_motes').addEventListener('change', e=>{ settings.motes=e.target.checked; saveSettings(); applyParticles(); });
+  $('s_fps').value=String(settings.fpsCap);
+  $('s_fps').addEventListener('change', e=>{ settings.fpsCap=+e.target.value; saveSettings(); });
+  $('s_fpsshow').checked=settings.showFps;
+  $('s_fpsshow').addEventListener('change', e=>{ settings.showFps=e.target.checked; saveSettings(); applyShowFps(); });
+  $('setclose').addEventListener('click', ()=>closeSettings());
+  $('setbtn').addEventListener('pointerdown', e=>{ e.preventDefault(); if (setOpen) closeSettings(); else openSettings(); }, {passive:false});
 }
 
 /* ---------- Boucle ---------- */
@@ -1120,19 +1239,19 @@ const bodyInWater = ()=> getBlock(Math.floor(player.pos.x), Math.floor(player.po
 const headInWater = ()=> getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y+player.eye), Math.floor(player.pos.z))===B.EAU;
 function tick(dt){
   const swim = bodyInWater();
-  const sprinting = (keys.ShiftLeft || sprintHeld) && !swim;
+  const sprinting = (down('sprint') || sprintHeld) && !swim;
   const speed = (sprinting?2.0:1) * (player.speedBuff>0?1.4:1) * (swim?8.5:12.5);
   const fwd=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
   const right=new THREE.Vector3(-fwd.z,0,fwd.x);
   const move=new THREE.Vector3();
-  if (keys.KeyW||keys.KeyZ) move.add(fwd);
-  if (keys.KeyS) move.sub(fwd);
-  if (keys.KeyD) move.add(right);
-  if (keys.KeyA||keys.KeyQ) move.sub(right);
+  if (down('forward')) move.add(fwd);
+  if (down('back')) move.sub(fwd);
+  if (down('right')) move.add(right);
+  if (down('left')) move.sub(right);
   if (touchMove.x||touchMove.y){ move.addScaledVector(fwd,-touchMove.y); move.addScaledVector(right,touchMove.x); }
-  if (move.lengthSq()>0) move.normalize().multiplyScalar(speed*dt);
+  if (move.lengthSq()>0) move.normalize().multiplyScalar(speed);
   player.vel.x=move.x; player.vel.z=move.z;
-  if (keys.Space){
+  if (down('jump') || keys.TouchJump){
     if (swim) player.vel.y = Math.min(player.vel.y+26*dt, 3.8);
     else if (player.onGround){ player.vel.y=9.6; player.onGround=false; }
   }
@@ -1169,7 +1288,7 @@ function tick(dt){
   const bob = player.onGround && !swim ? Math.sin(bobT)*Math.min(0.055, hSpeed*0.005) : 0;
   camera.position.set(p.x, p.y+player.eye+bob, p.z);
   camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  const fovTarget = swim ? 68 : (sprinting && hSpeed>2 ? 80 : 72);
+  const fovTarget = swim ? settings.fov-6 : (sprinting && hSpeed>2 ? settings.fov+9 : settings.fov);
   if (Math.abs(fovTarget-curFov)>0.05){
     curFov += (fovTarget-curFov)*Math.min(1, dt*7);
     camera.fov = curFov; camera.updateProjectionMatrix();
@@ -1208,6 +1327,11 @@ function tick(dt){
   moonSprite.material.opacity = Math.max(0, Math.min(1, -Math.sin(ang)*2+0.4));
   moonHalo.material.opacity = moonSprite.material.opacity*0.8;
   if (waterTex){ waterTex.offset.x=(waterTex.offset.x+dt*0.03)%1; waterTex.offset.y=(waterTex.offset.y+dt*0.011)%1; }
+  if (waterMat) waterMat.emissiveIntensity = 0.35+0.15*Math.sin(performance.now()*0.0012);
+  if (motes.visible){
+    motes.position.set(camera.position.x, camera.position.y-6+Math.sin(performance.now()*0.0004)*1.2, camera.position.z);
+    motes.rotation.y += dt*0.02;
+  }
   for (const m of clouds){
     m.position.x += m.userData.vx*dt;
     if (m.position.x - camera.position.x > 280) m.position.x -= 560;
@@ -1246,12 +1370,17 @@ function damagePlayer(v){
     document.getElementById('death').style.display='flex';
   }
 }
+const fpsVal=document.getElementById('fpsval');
+let fpsFrames=0, fpsT=performance.now();
 function loop(){
   requestAnimationFrame(loop);
   const now=performance.now();
+  if (settings.fpsCap>0 && now-last < 1000/settings.fpsCap - 0.5) return;
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if (!paused && player.alive) tick(dt);
-  renderer.render(scene,camera);
+  if (settings.bloom) composer.render(); else renderer.render(scene,camera);
+  fpsFrames++;
+  if (now-fpsT>500){ fpsVal.textContent=Math.round(fpsFrames*1000/(now-fpsT)); fpsT=now; fpsFrames=0; }
 }
 
 /* ---------- Démarrage ---------- */
@@ -1279,6 +1408,7 @@ document.getElementById('respawnbtn').addEventListener('pointerdown', e=>{
 }, {passive:false});
 
 renderHotbar(); renderBars(); renderInv();
+bindSettingsUI(); applyResolution(); applyShadows(); applyClouds(); applyParticles(); applyShowFps();
 updateChunks(player.pos.x, player.pos.z);
 if ('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 loop();
